@@ -17,6 +17,7 @@ urlpatterns = [
     
     # Users app
     path('', include('users.urls', namespace='users')),
+    path('', include('projects.urls', namespace='projects')),
     
     # Redirect root to dashboard
     path('', RedirectView.as_view(pattern_name='users:dashboard', permanent=False)),

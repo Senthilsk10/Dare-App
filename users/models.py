@@ -146,6 +146,7 @@ class PhDStudent(models.Model):
     ]
     
     student_id = models.CharField(max_length=50, unique=True)
+    email = models.EmailField(unique=True)
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
     guide = models.ForeignKey(Guide, on_delete=models.SET_NULL, null=True, blank=True)
     enrollment_date = models.DateField()

@@ -10,31 +10,31 @@ User = get_user_model()
 # ---------- STUDENT ----------
 @receiver(post_save, sender=PhDStudent)
 def sync_student_user(sender, instance, created, **kwargs):
-    username = instance.mail
-    password = str(instance.roll)
+    username = instance.email
+    password = str(instance.student_id)
 
     if created:
         # Create user on student creation
         User.objects.create_user(
-            username=username,
+            email=username,
             password=password,
-            role='student',
-            first_name=instance.name
+            role='STUDENT',
+            first_name=instance.email
         )
     else:
         # Update user on student update
         try:
-            user = User.objects.get(role='student', username=username)
-            user.first_name = instance.name
-            user.set_password(password)  # If roll number changes, update password
+            user = User.objects.get(role='STUDENT', username=username)
+            user.first_name = instance.email
+            user.set_password(password)  # If student_id number changes, update password
             user.save()
         except User.DoesNotExist:
             # In case user wasn't created before
             User.objects.create_user(
-                username=username,
+                email=username,
                 password=password,
                 role='STUDENT',
-                first_name=instance.name
+                first_name=instance.email
             )
 
 @receiver(post_delete, sender=PhDStudent)
