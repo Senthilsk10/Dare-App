@@ -1,6 +1,6 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="en" data-ng-app="dareApp" data-ng-controller="AppController as app">
+<html lang="en" data-ng-app="dareApp" data-ng-controller="AppController as app" x-data="{}" x-cloak>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -75,12 +75,27 @@
         </div>
     </div>
     
-    <!-- Alpine.js for interactivity -->
-    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.12.0/dist/cdn.min.js" defer></script>
+    <!-- Alpine.js for interactivity (load before AngularJS to ensure it's available) -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.12.0/dist/cdn.min.js"></script>
     <!-- AngularJS -->
     <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular.min.js"></script>
     <!-- Custom JS -->
     <script src="{% static 'js/app.js' %}"></script>
+    <!-- Alpine.js debug helper -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check if Alpine.js is loaded properly
+            setTimeout(function() {
+                if (typeof window.Alpine === 'undefined') {
+                    console.error('Alpine.js not detected after page load');
+                } else {
+                    console.log('Alpine.js is working properly');
+                    document.documentElement.classList.add('alpine-ready');
+                }
+            }, 100);
+        });
+    </script>
+    
     {% block extra_js %}{% endblock %}
 </body>
 </html>

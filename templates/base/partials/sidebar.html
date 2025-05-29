@@ -1,8 +1,7 @@
 <!-- Sidebar -->
 <aside class="fixed inset-y-0 left-0 z-40 w-64 overflow-y-auto transition duration-300 transform bg-gray-900 text-white lg:translate-x-0 lg:static lg:inset-0"
-       :class="{'-translate-x-full': !sidebarOpen}"
-       x-data="{ sidebarOpen: false }"
-       @sidebar-close.window="sidebarOpen = false">
+       :class="{'-translate-x-full': !$store.sidebar.open}"
+       @sidebar-close.window="$store.sidebar.close()">
     <div class="flex items-center justify-center h-16 px-6 bg-gray-900">
         <div class="flex items-center
                ">
@@ -190,7 +189,7 @@
     
     <!-- Mobile menu button -->
     <div class="lg:hidden absolute bottom-0 left-0 right-0 p-4 bg-gray-900 border-t border-gray-800">
-        <button @click="sidebarOpen = false" class="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+        <button @click="$store.sidebar.close()" class="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
             Close Menu
         </button>
     </div>

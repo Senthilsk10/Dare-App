@@ -111,7 +111,6 @@ class Course(models.Model):
 
 class Guide(models.Model):
     """Faculty members who can guide PhD students"""
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='guide_profile')
     is_hod = models.BooleanField(default=False)
     email = models.EmailField(unique=True)
     employee_id = models.CharField(max_length=50, unique=True)
@@ -124,7 +123,7 @@ class Guide(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     
     def __str__(self):
-        return f"Dr. {self.user.get_full_name()} - {self.department.code}"
+        return f"{self.email} - {self.department.code}"
     
     @property
     def current_student_count(self):
@@ -133,7 +132,6 @@ class Guide(models.Model):
 
 class PhDStudent(models.Model):
     """PhD students in the system"""
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='student_profile')
     STATUS_CHOICES = [
         ('ENROLLED', 'Enrolled'),
         ('PROJECT_PHASE', 'Project Phase'),
@@ -160,7 +158,7 @@ class PhDStudent(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     
     def __str__(self):
-        return f"{self.student_id} - {self.user.get_full_name()}"
+        return f"{self.student_id} - {self.email}"
     
     @property
     def can_submit_synopsis(self):

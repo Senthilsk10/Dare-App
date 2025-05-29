@@ -71,27 +71,28 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             
         elif user.is_hod:
             # HOD dashboard data
-            department = user.guide_profile.department
+            guide = Guide.objects.filter(email=user.email).first()
+            department = guide.department if guide else None
             context['department'] = department
             context['department_students'] = PhDStudent.objects.filter(
                 course__department=department
-            ).count()
+            ).count() if department else 0
             context['department_guides'] = Guide.objects.filter(
                 department=department
-            ).count()
+            ).count() if department else 0
             
         elif user.is_guide:
             # Guide dashboard data
-            guide = user.guide_profile
+            guide = Guide.objects.filter(email=user.email).first()
             context['guide'] = guide
-            context['current_students'] = user.guide_profile.phdstudent_set.count()
-            context['max_students'] = guide.max_students
+            context['current_students'] = guide.phdstudent_set.count() if guide else 0
+            context['max_students'] = guide.max_students if guide else 0
             
         elif user.is_student:
             # Student dashboard data
-            student = user.student_profile
+            student = PhDStudent.objects.filter(email=user.email).first()
             context['student'] = student
-            context['guide'] = student.guide
+            context['guide'] = student.guide if student else None
             
         return context
 
@@ -101,7 +102,7 @@ class ProfileView(LoginRequiredMixin, UpdateView):
     model = User
     fields = ['first_name', 'last_name', 'email', 'phone', 'profile_picture']
     template_name = 'profile.html'
-    success_url = reverse_lazy('profile')
+    success_url = reverse_lazy('users:profile')
     
     def get_object(self, queryset=None):
         return self.request.user
@@ -118,4 +119,4 @@ def switch_theme(request):
         del request.session['dark_mode']
     else:
         request.session['dark_mode'] = True
-    return redirect(request.META.get('HTTP_REFERER', 'dashboard'))
+    return redirect(request.META.get('HTTP_REFERER', 'users:dashboard'))

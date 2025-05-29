@@ -2,7 +2,7 @@
     <div class="flex items-center justify-between px-6 py-3">
         <!-- Mobile menu button -->
         <div class="flex items-center">
-            <button @click="sidebarOpen = !sidebarOpen" class="text-gray-500 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 lg:hidden">
+            <button @click="$store.sidebar.toggle()" class="text-gray-500 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 lg:hidden">
                 <span class="sr-only">Open sidebar</span>
                 <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
@@ -16,7 +16,7 @@
         <!-- Right side navigation -->
         <div class="flex items-center space-x-4">
             <!-- Notifications -->
-            <div class="relative" x-data="{ open: false }">
+            <div class="relative" x-data="{ open: false }" x-init="$data.open = false">
                 <button @click="open = !open" class="p-1 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full">
                     <span class="sr-only">View notifications</span>
                     <div class="relative">
@@ -51,7 +51,7 @@
             </div>
             
             <!-- Profile dropdown -->
-            <div class="relative ml-3" x-data="{ open: false }">
+            <div class="relative ml-3" x-data="{ open: false }" x-init="$data.open = false">
                 <button @click="open = !open" class="flex items-center max-w-xs text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" id="user-menu" aria-expanded="false" aria-haspopup="true">
                     <span class="sr-only">Open user menu</span>
                     <div class="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-medium">
