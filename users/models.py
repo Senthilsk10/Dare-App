@@ -126,6 +126,10 @@ class Guide(models.Model):
         return f"{self.email} - {self.department.code}"
     
     @property
+    def user(self):
+        return User.objects.get(email=self.email)
+    
+    @property
     def current_student_count(self):
         return self.phdstudent_set.filter(status__in=['ENROLLED', 'PROJECT_PHASE']).count()
 
@@ -160,6 +164,10 @@ class PhDStudent(models.Model):
     
     def __str__(self):
         return f"{self.student_id} - {self.email}"
+    
+    @property
+    def user(self):
+        return User.objects.get(email=self.email)
     
     @property
     def can_submit_synopsis(self):
@@ -201,17 +209,11 @@ class Evaluator(models.Model):
     
     name = models.CharField(max_length=200)
     email = models.EmailField(unique=True)
-    phone = models.CharField(max_length=20, blank=True)
-    institution = models.CharField(max_length=300)
-    designation = models.CharField(max_length=100)
     specialization = models.TextField()
     country = models.CharField(max_length=100)
     evaluator_type = models.CharField(max_length=10, choices=EVALUATOR_TYPE_CHOICES)
     is_active = models.BooleanField(default=True)
-    priority_score = models.IntegerField(default=1, help_text="Higher score = higher priority")
-    total_evaluations = models.IntegerField(default=0)
-    average_response_time_days = models.IntegerField(default=7)
     created_at = models.DateTimeField(auto_now_add=True)
     
     def __str__(self):
-        return f"{self.name} - {self.institution} ({self.evaluator_type})"
+        return f"{self.name} - ({self.evaluator_type})"
