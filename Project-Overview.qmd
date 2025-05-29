@@ -1,0 +1,658 @@
+# PhD Student Management System Documentation
+
+## Table of Contents
+
+1.  [System Overview](#system-overview)
+2.  [System Architecture](#system-architecture)
+3.  [User Roles & Permissions](#user-roles--permissions)
+4.  [Data Models](#data-models)
+5.  [Workflow Diagrams](#workflow-diagrams)
+6.  [API Structure](#api-structure)
+7.  [Implementation Details](#implementation-details)
+
+## System Overview {#system-overview}
+
+The PhD Student Management System is a comprehensive web application designed to manage the entire lifecycle of PhD students from enrollment to graduation. The system handles:
+
+-   **Student Enrollment & Management**: Track students through their academic journey
+-   **Fee Management**: Semester-wise fee tracking and payment status
+-   **Guide Assignment**: Faculty supervision and project guidance
+-   **Project Lifecycle**: From synopsis submission to final evaluation
+-   **Evaluator Management**: International and domestic evaluator assignment and communication
+-   **Email Automation**: Automated communication with evaluators and stakeholders
+-   **Admin Dashboard**: Centralized management and notification system
+-   **Google Forms Integration**: Seamless document submission via webhooks
+
+### Key Features
+
+-   **8-semester PhD program structure**
+-   **Project submission starts from semester 4**
+-   **Dual evaluator system** (1 Foreign + 1 Indian)
+-   **3-attempt email communication system**
+-   **Automated workflow notifications**
+-   **Payment tracking for evaluators**
+-   **Comprehensive audit trails**
+
+## System Architecture {#system-architecture}
+
+``` mermaid
+graph TB
+    subgraph "Frontend Layer"
+        WEB[Web Application]
+        MOBILE[Mobile App]
+        FORMS[Google Forms]
+    end
+    
+    subgraph "API Layer"
+        REST[REST API<br/>Modifications]
+        GQL[GraphQL API<br/>Queries]
+        WEBHOOK[Webhook Handler]
+    end
+    
+    subgraph "Business Logic"
+        AUTH[Authentication]
+        PERM[Permission System]
+        WORKFLOW[Workflow Engine]
+        EMAIL[Email Service]
+        NOTIFY[Notification System]
+    end
+    
+    subgraph "Data Layer"
+        DB[(PostgreSQL Database)]
+        FILES[File Storage<br/>Google Drive]
+        CACHE[Redis Cache]
+    end
+    
+    WEB --> REST
+    WEB --> GQL
+    MOBILE --> REST
+    MOBILE --> GQL
+    FORMS --> WEBHOOK
+    
+    REST --> AUTH
+    GQL --> AUTH
+    WEBHOOK --> AUTH
+    
+    AUTH --> PERM
+    PERM --> WORKFLOW
+    WORKFLOW --> EMAIL
+    WORKFLOW --> NOTIFY
+    
+    WORKFLOW --> DB
+    EMAIL --> DB
+    NOTIFY --> DB
+    FILES --> DB
+```
+
+## User Roles & Permissions
+
+### 1. PhD Student
+
+**Permissions:** - View own profile and academic records - View assigned guide and contact details - Submit project synopsis (after semester 4) - Submit final project document - View fee status and payment history - Track project evaluation status
+
+**Restrictions:** - Cannot modify academic status - Cannot access other students' data - Cannot assign guides or evaluators
+
+### 2. Guide/Supervisor
+
+**Permissions:** - View assigned students' profiles and progress - Approve/reject project synopsis - Add comments and feedback - Update own profile information - View students' fee status
+
+**Restrictions:** - Cannot create or delete students - Cannot access students from other guides - Cannot modify system configurations
+
+### 3. Admin/Staff
+
+**Permissions:** - Full CRUD operations on all entities - Assign guides to students - Manage evaluator pools - Process fee payments - Send system notifications - Configure system settings - Access all reports and analytics
+
+**Restrictions:** - Cannot modify historical audit records
+
+## Data Models {#data-models}
+
+### Core Entities Relationship
+
+``` {.mermaid}
+erDiagram
+    User ||--|| PhDStudent : "has"
+    User ||--|| Guide : "has"
+    Department ||--o{ Guide : "employs"
+    Department ||--o{ Course : "offers"
+    Course ||--o{ PhDStudent : "enrolls"
+    Guide ||--o{ PhDStudent : "supervises"
+    PhDStudent ||--o{ SemesterFee : "pays"
+    PhDStudent ||--|| Project : "submits"
+    Project ||--o{ ProjectEvaluatorPool : "has"
+    Evaluator ||--o{ ProjectEvaluatorPool : "in"
+    Project ||--o{ EmailCommunication : "generates"
+    Evaluator ||--o{ EmailCommunication : "receives"
+    Project ||--o{ AdminNotification : "triggers"
+    Project ||--o{ ProjectStatusHistory : "tracks"
+    
+    User {
+        int id PK
+        string username
+        string email
+        string first_name
+        string last_name
+        boolean is_active
+    }
+    
+    Department {
+        int id PK
+        string name
+        string code
+        string head_of_department
+        string contact_email
+        string phone
+        datetime created_at
+    }
+    
+    Course {
+        int id PK
+        string name
+        string code
+        int department_id FK
+        int total_semesters
+        int min_project_semester
+        decimal fee_per_semester
+        datetime created_at
+    }
+    
+    Guide {
+        int id PK
+        int user_id FK
+        string employee_id
+        int department_id FK
+        string designation
+        text specialization
+        string phone
+        text office_address
+        boolean is_active
+        int max_students
+        datetime created_at
+    }
+    
+    PhDStudent {
+        int id PK
+        int user_id FK
+        string student_id
+        int course_id FK
+        int guide_id FK
+        date enrollment_date
+        int current_semester
+        string status
+        string phone
+        text address
+        string emergency_contact_name
+        string emergency_contact_phone
+        boolean is_active
+        datetime created_at
+        datetime updated_at
+    }
+    
+    Project {
+        uuid id PK
+        int student_id FK
+        string title
+        string synopsis_file_id
+        datetime synopsis_submitted_date
+        datetime guide_approval_date
+        text guide_comments
+        string status
+        int assigned_foreign_evaluator_id FK
+        int assigned_indian_evaluator_id FK
+        string project_file_id
+        datetime project_submitted_date
+        text evaluation_feedback
+        datetime evaluation_completed_date
+        datetime viva_date
+        string viva_venue
+        string viva_result
+        decimal evaluator_payment_amount
+        datetime payment_completed_date
+        string payment_reference
+        datetime created_at
+        datetime updated_at
+    }
+    
+    Evaluator {
+        int id PK
+        string name
+        string email
+        string phone
+        string institution
+        string designation
+        text specialization
+        string country
+        string evaluator_type
+        boolean is_active
+        int priority_score
+        int total_evaluations
+        int average_response_time_days
+        datetime created_at
+    }
+    
+    SemesterFee {
+        int id PK
+        int student_id FK
+        int semester
+        decimal amount
+        date due_date
+        string payment_status
+        date payment_date
+        string payment_reference
+        text remarks
+        datetime created_at
+    }
+```
+
+### Communication & Workflow Models
+
+``` mermaid
+erDiagram
+    Project ||--o{ EmailCommunication : "generates"
+    Project ||--o{ AdminNotification : "creates"
+    Project ||--o{ ProjectStatusHistory : "tracks"
+    Project ||--o{ ProjectEvaluatorPool : "has"
+    
+    EmailCommunication {
+        uuid id PK
+        uuid project_id FK
+        int evaluator_id FK
+        string email_type
+        string subject
+        datetime sent_date
+        string status
+        int attempt_number
+        datetime response_date
+        text response_content
+        string message_id
+        json attachments_sent
+        datetime created_at
+    }
+    
+    AdminNotification {
+        int id PK
+        uuid project_id FK
+        string notification_type
+        string title
+        text message
+        string priority
+        boolean is_read
+        datetime created_at
+        datetime read_at
+    }
+    
+    ProjectStatusHistory {
+        int id PK
+        uuid project_id FK
+        string previous_status
+        string new_status
+        int changed_by FK
+        text change_reason
+        datetime changed_at
+    }
+    
+    ProjectEvaluatorPool {
+        int id PK
+        uuid project_id FK
+        int evaluator_id FK
+        datetime assigned_date
+        int priority_order
+    }
+    
+    WebhookLog {
+        int id PK
+        string form_id
+        string submission_id
+        string student_email
+        string file_id
+        string file_name
+        string file_url
+        json raw_payload
+        boolean processed
+        text processing_error
+        datetime created_at
+    }
+```
+
+## Workflow Diagrams {#workflow-diagrams}
+
+### 1. Student Enrollment to Project Submission
+
+``` mermaid
+flowchart TD
+    A[Student Enrollment] --> B[Semester Fee Payment]
+    B --> C{Current Semester >= 4?}
+    C -->|No| D[Continue Studies]
+    D --> E[Next Semester]
+    E --> B
+    C -->|Yes| F[Eligible for Project Submission]
+    F --> G[Submit Synopsis via Google Forms]
+    G --> H[Webhook Processes Submission]
+    H --> I[Project Record Created]
+    I --> J[Guide Notification]
+    J --> K{Guide Approval?}
+    K -->|Rejected| L[Student Notified for Revision]
+    L --> G
+    K -->|Approved| M[Admin Notification Generated]
+    M --> N[Admin Assigns Evaluator Pool]
+    N --> O[10 Evaluators Assigned<br/>5 Foreign + 5 Indian]
+```
+
+### 2. Evaluator Selection Process
+
+``` mermaid
+flowchart TD
+    A[Evaluator Pool Assigned] --> B[Start Email Process]
+    B --> C[Send Email to Priority 1 Foreign Evaluator]
+    C --> D[Send Email to Priority 1 Indian Evaluator]
+    D --> E[Wait for Response]
+    E --> F{Response within Timeframe?}
+    F -->|Yes - Accepted| G[Evaluator Confirmed]
+    F -->|No Response| H[Attempt 2]
+    H --> I[Send Follow-up Email]
+    I --> J{Response within Timeframe?}
+    J -->|Yes - Accepted| G
+    J -->|No Response| K[Attempt 3]
+    K --> L[Final Follow-up Email]
+    L --> M{Response within Timeframe?}
+    M -->|Yes - Accepted| G
+    M -->|No Response| N[Move to Next Priority Evaluator]
+    N --> O[Repeat Process with Next Evaluator]
+    F -->|Yes - Rejected| N
+    J -->|Yes - Rejected| N
+    M -->|Yes - Rejected| N
+    G --> P[Both Evaluators Confirmed]
+    P --> Q[Admin Notified]
+    Q --> R[Project Development Phase]
+```
+
+### 3. Project Evaluation to Completion
+
+``` mermaid
+flowchart TD
+    A[Student Submits Final Project] --> B[Send Project to Evaluators]
+    B --> C[Email Notification to Evaluators]
+    C --> D[Evaluators Review Project]
+    D --> E[Evaluators Submit Feedback]
+    E --> F[Parse Email Responses]
+    F --> G[Admin Notification]
+    G --> H{Evaluation Complete?}
+    H -->|No| I[Follow-up with Evaluators]
+    I --> D
+    H -->|Yes| J[Admin Reviews Evaluation]
+    J --> K[Schedule Viva]
+    K --> L[Viva Conducted]
+    L --> M[Mark Viva Complete]
+    M --> N[Process Evaluator Payment]
+    N --> O[Payment Confirmation]
+    O --> P[Project Marked as Completed]
+    P --> Q[Student Graduation Process]
+```
+
+### 4. System Notification Flow
+
+``` mermaid
+flowchart TD
+    A[System Event Triggered] --> B{Event Type}
+    B -->|Synopsis Submitted| C[Notify Guide]
+    B -->|Synopsis Approved| D[Notify Admin]
+    B -->|Evaluator Assigned| E[Notify Admin]
+    B -->|Project Submitted| F[Notify Evaluators & Admin]
+    B -->|Evaluation Complete| G[Notify Admin]
+    B -->|Viva Ready| H[Notify Admin]
+    B -->|Payment Due| I[Notify Admin]
+    B -->|Email Failed| J[Notify Admin - High Priority]
+    
+    C --> K[Email Notification]
+    D --> L[Dashboard Notification]
+    E --> L
+    F --> M[Multiple Notifications]
+    G --> L
+    H --> L
+    I --> N[Urgent Dashboard Alert]
+    J --> N
+    
+    K --> O[Guide Dashboard Update]
+    L --> P[Admin Dashboard Update]
+    M --> Q[Email + Dashboard Updates]
+    N --> R[Priority Alert System]
+```
+
+## API Structure {#api-structure}
+
+### REST API Endpoints (Modifications)
+
+#### Student Endpoints
+
+```         
+POST   /api/v1/students/                    # Create student (admin only)
+GET    /api/v1/students/                    # List students (filtered by role)
+GET    /api/v1/students/{id}/               # Get student details
+PATCH  /api/v1/students/{id}/               # Update student info
+PATCH  /api/v1/students/{id}/update_status/ # Update academic status (admin)
+GET    /api/v1/students/{id}/fees/          # Get student fees
+```
+
+#### Project Endpoints
+
+```         
+POST   /api/v1/projects/                    # Create project (student)
+GET    /api/v1/projects/                    # List projects (filtered by role)
+GET    /api/v1/projects/{id}/               # Get project details
+PATCH  /api/v1/projects/{id}/approve_synopsis/ # Approve synopsis (guide)
+PATCH  /api/v1/projects/{id}/submit_project/   # Submit final project (student)
+POST   /api/v1/projects/{id}/assign_evaluators/ # Assign evaluators (admin)
+```
+
+#### Guide Endpoints
+
+```         
+POST   /api/v1/guides/                      # Create guide (admin only)
+GET    /api/v1/guides/                      # List guides
+GET    /api/v1/guides/{id}/                 # Get guide details
+PATCH  /api/v1/guides/{id}/                 # Update guide info
+GET    /api/v1/guides/{id}/students/        # Get assigned students
+```
+
+#### Admin Endpoints
+
+```         
+GET    /api/v1/notifications/               # List notifications
+GET    /api/v1/notifications/unread_count/  # Count unread notifications
+GET    /api/v1/notifications/grouped_notifications/ # Group by type
+PATCH  /api/v1/notifications/{id}/mark_read/ # Mark as read
+```
+
+#### Webhook Endpoints
+
+```         
+POST   /api/v1/webhooks/google_forms_webhook/ # Google Forms integration
+```
+
+### GraphQL Schema (Queries)
+
+``` graphql
+type Query {
+  # Student Queries
+  students(filters: StudentFilters): [Student]
+  student(id: ID!): Student
+  
+  # Project Queries
+  projects(filters: ProjectFilters): [Project]
+  project(id: ID!): Project
+  projectsByStatus(status: ProjectStatus!): [Project]
+  
+  # Guide Queries
+  guides(departmentId: ID): [Guide]
+  guide(id: ID!): Guide
+  
+  # Admin Dashboard Queries
+  dashboardStats: DashboardStats
+  pendingApprovals: [Project]
+  overduePayments: [SemesterFee]
+  evaluatorWorkload: [EvaluatorStats]
+  
+  # Reports
+  studentProgressReport(studentId: ID!): ProgressReport
+  departmentReport(departmentId: ID!): DepartmentReport
+  financialReport(dateRange: DateRange!): FinancialReport
+}
+
+type Student {
+  id: ID!
+  user: User!
+  studentId: String!
+  course: Course!
+  guide: Guide
+  currentSemester: Int!
+  status: StudentStatus!
+  fees: [SemesterFee]
+  project: Project
+  enrollmentDate: Date!
+  canSubmitSynopsis: Boolean!
+}
+
+type Project {
+  id: ID!
+  student: Student!
+  title: String!
+  status: ProjectStatus!
+  synopsisSubmittedDate: DateTime
+  guideApprovalDate: DateTime
+  assignedEvaluators: [Evaluator]
+  evaluatorPool: [Evaluator]
+  emailCommunications: [EmailCommunication]
+  statusHistory: [ProjectStatusHistory]
+  vivaDate: DateTime
+  isCompleted: Boolean!
+}
+
+type DashboardStats {
+  totalStudents: Int!
+  activeProjects: Int!
+  pendingApprovals: Int!
+  overduePayments: Int!
+  completedProjects: Int!
+  projectsByStatus: [ProjectStatusCount]
+}
+```
+
+## Implementation Details {#implementation-details}
+
+### Technology Stack
+
+**Backend:** - **Framework**: Django 4.2+ with Django REST Framework - **Database**: Mysql - **Cache**: Redis currently not needed - **API**: REST API + GraphQL (using Graphene-Django) - **Email**: Django Email with SMTP - **File Storage**: Google Forms File Submission and tracking the file in the database
+
+**Frontend:** - **Framework**: Django Jinja Templates - **Note**: in some cases SPA needed with django admin interface for better user experience which consumes the django rest api - **SPA**: Angular JS within the django admin interface via CDN
+
+### Key Implementation Features
+
+#### 1. Permission System
+
+``` python
+class IsGuide(permissions.BasePermission):
+    def has_permission(self, request, view):
+        return hasattr(request.user, 'guide')
+
+class IsOwnerOrAdmin(permissions.BasePermission):
+    def has_object_permission(self, request, view, obj):
+        if request.user.is_staff:
+            return True
+        if hasattr(obj, 'user'):
+            return obj.user == request.user
+        return False
+```
+
+#### 2. Email Automation System
+
+``` python
+class EvaluatorEmailService:
+    def send_invitation_email(self, project, evaluator, attempt_number):
+        # Send email with 3-attempt logic
+        # Track email status and responses
+        # Auto-fallback to next priority evaluator
+        pass
+    
+    def process_email_responses(self):
+        # Parse incoming email responses
+        # Update project status based on acceptance/rejection
+        # Trigger admin notifications
+        pass
+```
+
+#### 3. Webhook Integration
+
+``` python
+@api_view(['POST'])
+@permission_classes([])
+def google_forms_webhook(request):
+    # Process Google Forms submission
+    # Extract file information
+    # Create project record
+    # Trigger workflow notifications
+    pass
+```
+
+#### 4. Notification System
+
+``` python
+class NotificationService:
+    def create_notification(self, project, notification_type, priority='MEDIUM'):
+        # Create admin notification
+        # Send real-time updates via WebSocket
+        # Group similar notifications
+        pass
+    
+    def get_grouped_notifications(self):
+        # Return notifications grouped by type and priority
+        # Enable bulk actions on notifications
+        pass
+```
+
+### Database Optimization
+
+1.  **Indexing Strategy**:
+    -   Composite indexes on frequently queried fields
+    -   Foreign key indexes for join operations
+    -   Status field indexes for filtering
+2.  **Query Optimization**:
+    -   Use `select_related()` for foreign key relationships
+    -   Use `prefetch_related()` for many-to-many relationships
+    -   Implement query result caching
+3.  **Data Archival**:
+    -   Archive completed projects after 2 years
+    -   Maintain audit trails for compliance
+    -   Implement soft delete for critical records
+
+### Security Considerations
+
+1.  **Authentication & Authorization**:
+    -   JWT token-based authentication
+    -   Role-based access control (RBAC)
+    -   API rate limiting and throttling
+2.  **Data Protection**:
+    -   Field-level encryption for sensitive data
+    -   Audit logging for all modifications
+    -   GDPR compliance for data handling
+3.  **API Security**:
+    -   Input validation and sanitization
+    -   SQL injection protection
+    -   CORS configuration for cross-origin requests
+
+### Monitoring & Analytics
+
+1.  **Application Monitoring**:
+    -   Response time tracking
+    -   Error rate monitoring
+    -   User activity analytics
+2.  **Business Metrics**:
+    -   Student progression rates
+    -   Evaluator response times
+    -   Fee collection efficiency
+    -   Project completion timelines
+3.  **System Health**:
+    -   Database performance metrics
+    -   Email delivery rates
+    -   API endpoint performance
+    -   Resource utilization tracking
+
+This documentation provides a comprehensive overview of the PhD Student Management System, including all models, workflows, API structures, and implementation details necessary for development and maintenance.

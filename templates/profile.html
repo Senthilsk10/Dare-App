@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% block title %}My Profile - DARE{% endblock %}
+{% block content %}
+<div class="max-w-2xl mx-auto py-6 px-4">
+    <h1 class="text-2xl font-bold mb-4">My Profile</h1>
+    <form method="post" enctype="multipart/form-data" class="bg-white shadow rounded p-6 space-y-4">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        <div class="flex flex-col md:flex-row md:space-x-6">
+            <div class="flex-shrink-0 mb-4 md:mb-0">
+                {% if user.is_authenticated and user.profile_picture %}
+                    <img src="{{ user.profile_picture.url }}" class="h-24 w-24 rounded-full object-cover border" alt="Profile Picture">
+                {% else %}
+                    <div class="h-24 w-24 rounded-full bg-gray-200 flex items-center justify-center">
+                        <svg class="h-12 w-12 text-gray-400" fill="currentColor" viewBox="0 0 24 24"><path d="M24 20.993V24H0v-2.996A14.977 14.977 0 0112.004 15c4.67 0 8.997 1.701 11.996 5.993zM16.002 8.999a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                    </div>
+                {% endif %}
+                <input type="file" name="profile_picture" class="mt-2 block w-full text-sm text-gray-500">
+            </div>
+            <div class="flex-1 space-y-4">
+                <div>
+                    <label for="id_first_name" class="block text-sm font-medium text-gray-700">First Name</label>
+                    {{ form.first_name }}
+                    {% if form.first_name.errors %}<p class="text-red-500 text-xs">{{ form.first_name.errors.0 }}</p>{% endif %}
+                </div>
+                <div>
+                    <label for="id_last_name" class="block text-sm font-medium text-gray-700">Last Name</label>
+                    {{ form.last_name }}
+                    {% if form.last_name.errors %}<p class="text-red-500 text-xs">{{ form.last_name.errors.0 }}</p>{% endif %}
+                </div>
+                <div>
+                    <label for="id_email" class="block text-sm font-medium text-gray-700">Email</label>
+                    {{ form.email }}
+                    {% if form.email.errors %}<p class="text-red-500 text-xs">{{ form.email.errors.0 }}</p>{% endif %}
+                </div>
+                <div>
+                    <label for="id_phone" class="block text-sm font-medium text-gray-700">Phone</label>
+                    {{ form.phone }}
+                    {% if form.phone.errors %}<p class="text-red-500 text-xs">{{ form.phone.errors.0 }}</p>{% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="pt-4">
+            <button type="submit" class="w-full md:w-auto px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Save Changes</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard - DARE{% endblock %}
+{% block content %}
+<div class="max-w-7xl mx-auto py-6 px-4">
+    <h1 class="text-2xl font-bold mb-4">Welcome, {{ user.get_full_name|default:user.username }}</h1>
+    {% if user.is_admin %}
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-white rounded shadow p-4">
+                <div class="text-gray-500">Total Users</div>
+                <div class="text-2xl font-bold">{{ total_users }}</div>
+            </div>
+            <div class="bg-white rounded shadow p-4">
+                <div class="text-gray-500">Total Students</div>
+                <div class="text-2xl font-bold">{{ total_students }}</div>
+            </div>
+            <div class="bg-white rounded shadow p-4">
+                <div class="text-gray-500">Total Guides</div>
+                <div class="text-2xl font-bold">{{ total_guides }}</div>
+            </div>
+        </div>
+    {% elif user.is_hod %}
+        <div class="bg-white rounded shadow p-4 mb-4">
+            <div class="text-gray-500">Department</div>
+            <div class="text-xl font-semibold">{{ department }}</div>
+            <div class="mt-2">Students: <span class="font-bold">{{ department_students }}</span></div>
+            <div>Guides: <span class="font-bold">{{ department_guides }}</span></div>
+        </div>
+    {% elif user.is_guide %}
+        <div class="bg-white rounded shadow p-4 mb-4">
+            <div class="text-gray-500">Current Students</div>
+            <div class="text-xl font-semibold">{{ current_students }} / {{ max_students }}</div>
+        </div>
+    {% elif user.is_student %}
+        <div class="bg-white rounded shadow p-4 mb-4">
+            <div class="text-gray-500">Guide</div>
+            <div class="text-xl font-semibold">{{ guide.user.get_full_name }}</div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
