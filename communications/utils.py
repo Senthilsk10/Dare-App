@@ -19,11 +19,11 @@ def send_evaluator_approach_email(project, evaluator_pool):
         context = {
             'recipient_name': evaluator_pool.evaluator.name,
             'recipient_location': evaluator_pool.evaluator.country,
-            'candidate_name': project.student.user.get_full_name(),
+            'candidate_name': project.student.user.get_full_name() or project.student.user.get_user_name_from_email,
             'roll_no': project.student.student_id,
             'department': project.student.course.department,
             'thesis_title': project.title,
-            'supervisor_name': project.student.guide.user.get_full_name(),
+            'supervisor_name': project.student.guide.user.get_full_name() or project.student.guide.user.get_user_name_from_email,
             'consent_deadline': (timezone.now() + timezone.timedelta(days=15)).strftime('%d-%m-%Y'),
             'indian_remuneration': project.i_evaluator_payment_amount,
             'foreign_remuneration': project.f_evaluator_payment_amount,

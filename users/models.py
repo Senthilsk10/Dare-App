@@ -4,6 +4,7 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 import uuid
+import re
 
 
 class UserManager(BaseUserManager):
@@ -81,6 +82,13 @@ class User(AbstractUser):
     def is_admin(self):
         return self.role == self.Role.ADMIN or self.is_superuser
 
+    @property
+    def get_user_name_from_email(self):
+        pattern = r"^([^@]+)@"
+        match = re.search(pattern, self.email)
+        if match:
+            return match.group(1) if match.group(1) else ""
+        return ""
 
 class Department(models.Model):
     """Academic departments offering PhD programs"""

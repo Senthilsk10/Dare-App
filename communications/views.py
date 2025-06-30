@@ -9,7 +9,7 @@ from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
 from datetime import timedelta
-from .models import Project
+from .models import EmailCommunication
 from .gmail_utils import send_mail_with_attachments, GoogleServiceManager, send_simple_email
  
 # Django Views
@@ -127,14 +127,47 @@ def send_email(request):
     pool_id = data.get('project_pool_id')
     pool = get_object_or_404(ProjectEvaluatorPool, id=pool_id)
     result = pool.send_approach_email()
-    attachments = []
+    attachments = [] #add default acceptance form if here..
     webhook_obj = WebhookLog.objects.filter(project=pool.project,file_type="SYNOPSIS").first()
     if webhook_obj:
         attachments.append(webhook_obj.file_id)
     
-    message_id = send_mail_with_attachments(result['to'], result['subject'], result['body'], drive_file_ids=attachments)
-    # here save the message id in the communication logs.
-    # pool.last_email_date = timezone.now()
-    # pool.update_next_email_date()
-    # pool.save()
-    return JsonResponse({'success': True, 'result': result})
+    try:
+        message_id = send_mail_with_attachments(request, result['to'], result['subject'], result['body'], drive_file_ids=attachments)
+        # here save the message id in the communication logs.
+        if pool.retry_count < 1:
+            EmailCommunication.objects.create(eval_pool=pool, email_type='INVITATION', subject=result['subject'], 
+                                           body=result['body'], sent_date=timezone.now(), message_id=message_id)
+        else:
+            EmailCommunication.objects.create(eval_pool=pool, email_type='REMINDER', subject=result['subject'], 
+                                           body=result['body'], sent_date=timezone.now(), message_id=message_id)
+        
+        pool.retry_count += 1
+        pool.last_email_date = timezone.now()
+        pool.next_email_date = timezone.now() + timedelta(days=15)
+        pool.save()
+        return JsonResponse({'success': True, 'result': message_id})
+    except Exception as e:
+        # Log the error but still save the communication
+        error_message = str(e)
+        if pool.retry_count < 1:
+            EmailCommunication.objects.create(
+                eval_pool=pool, 
+                email_type='INVITATION', 
+                subject=result['subject'], 
+                body=result['body'], 
+                sent_date=timezone.now(),
+                status='FAILED',
+                error_message=error_message
+            )
+        else:
+            EmailCommunication.objects.create(
+                eval_pool=pool, 
+                email_type='REMINDER', 
+                subject=result['subject'], 
+                body=result['body'], 
+                sent_date=timezone.now(),
+                status='FAILED',
+                error_message=error_message
+            )
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
