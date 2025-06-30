@@ -4,7 +4,6 @@ from .models import PhDStudent,Guide,Department,Evaluator,User,Course,SemesterFe
 site.register(Guide)
 site.register(PhDStudent)
 site.register(Department)
-site.register(Evaluator) 
 site.register(User)
 site.register(Course)
 site.register(SemesterFee)

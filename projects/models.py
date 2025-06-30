@@ -6,6 +6,7 @@ import uuid
 class Project(models.Model):
     """PhD projects and their lifecycle"""
     STATUS_CHOICES = [
+        ('CREATED','project created'),
         ('SYNOPSIS_SUBMITTED', 'Synopsis Submitted'),
         ('SYNOPSIS_APPROVED', 'Synopsis Approved by Guide'),
         ('ADMIN_NOTIFIED', 'Admin Notified'),
@@ -27,7 +28,7 @@ class Project(models.Model):
     student = models.OneToOneField(PhDStudent, on_delete=models.CASCADE)
     title = models.CharField(max_length=500)
     guide_comments = models.TextField(blank=True)
-    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='SYNOPSIS_SUBMITTED')
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='CREATED')
     
     # Evaluator assignment
     assigned_foreign_evaluator = models.ForeignKey(
@@ -64,29 +65,48 @@ class Project(models.Model):
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    referel_id = models.CharField(max_length=20, blank=True,editable=False)
+    referel_id = models.CharField(max_length=20, blank=True)
+    
+    
+    def get_calender_evaluators(self):
+        foreign = self.evaluator_pool.filter(evaluator__evaluator_type='FOREIGN', retry_count__lt=3).order_by('-priority_order').first()
+        indian = self.evaluator_pool.filter(evaluator__evaluator_type='INDIAN', retry_count__lt=3).order_by('-priority_order').first()
+        return [foreign, indian]
+            
+    
     
     def get_evaluators(self):
         # Get evaluators, marking whether they are assigned (selected) or from pool (unselected)
-        foreign_evaluator = self.assigned_foreign_evaluator or ProjectEvaluatorPool.objects.filter(
+        f_mail_send = False
+        i_mail_send = False
+        foreign_evaluator = ProjectEvaluatorPool.objects.filter(
             project=self, 
             evaluator__evaluator_type='FOREIGN',
             retry_count__lt=3
         ).order_by('-priority_order').first()
-        indian_evaluator = self.assigned_indian_evaluator or ProjectEvaluatorPool.objects.filter(
+        if isinstance(foreign_evaluator, ProjectEvaluatorPool):
+            if foreign_evaluator.last_email_date is None:
+                f_mail_send = True  # No email has ever been sent
+            else:
+                f_mail_send = (timezone.now() - foreign_evaluator.last_email_date) > timedelta(days=15)
+        indian_evaluator = ProjectEvaluatorPool.objects.filter(
             project=self, 
             evaluator__evaluator_type='INDIAN',
-            retry_count__lt=3
+            retry_count__lt=3,
         ).order_by('-priority_order').first()
-        
+        if isinstance(indian_evaluator, ProjectEvaluatorPool):
+            if indian_evaluator.last_email_date is None:
+                i_mail_send = True  # No email has ever been sent
+            else:
+                i_mail_send = (timezone.now() - indian_evaluator.last_email_date) > timedelta(days=15)
         return [
             {
                 'evaluator': foreign_evaluator,
-                'is_selected': bool(self.assigned_foreign_evaluator)
+                'send_mail': f_mail_send 
             },
             {
                 'evaluator': indian_evaluator,
-                'is_selected': bool(self.assigned_indian_evaluator)
+                'send_mail': i_mail_send 
             }
         ]
     
@@ -101,7 +121,7 @@ class Project(models.Model):
         return f"{alpha_part}-{hash_part}"
     
     def save(self, *args, **kwargs):
-        if not self.id:
+        if not self.referel_id:  # Changed to check for None or empty string
             self.referel_id = self.generate_referel_id()
         super().save(*args, **kwargs)
     
@@ -134,6 +154,8 @@ class ProjectEvaluatorPool(models.Model):
     assigned_date = models.DateTimeField(auto_now_add=True)
     priority_order = models.IntegerField(help_text="1-5 for each type (foreign/indian) & Higher score = higher priority")
     retry_count = models.IntegerField(default=0)
+    last_email_date = models.DateTimeField(null=True, blank=True)
+    next_email_date = models.DateTimeField(null=True, blank=True)
     
     class Meta:
         unique_together = ['project', 'evaluator']
@@ -148,8 +170,13 @@ class ProjectEvaluatorPool(models.Model):
         from communications.utils import send_evaluator_approach_email
         return send_evaluator_approach_email(self.project, self)
     
+    def update_next_email_date(self):
+        self.next_email_date = timezone.now() + timezone.timedelta(days=15)
+        self.save()
+    
     def __str__(self):
-        return f"{self.project.student.student_id} - {self.evaluator.name} (Priority: {self.priority_order})"
+        return f"{self.project.student.student_id} - {self.evaluator
+    .name} (Priority: {self.priority_order})"
 
 
 class WebhookLog(models.Model):
@@ -160,8 +187,20 @@ class WebhookLog(models.Model):
     raw_payload = models.JSONField()
     guide_approval_date = models.DateTimeField(null=True, blank=True)
     processed = models.BooleanField(default=False)
-    processing_error = models.TextField(blank=True)
+    """
+    processing error fields maintain that the evaluator or the guide has not approved the project
+    use the text field to hold a json like object:
+    {
+        processed_by: "EVALUATOR" or "GUIDE"
+        correction_file_id: "Google Drive file ID"
+    }may be best if added those fields... i think not neccessary ofcourse we can make the admin to it..
+    
+    add a email communication to student if evaluator or guide has not approved the project - create a new template for it.
+    """
+    
+    processing_error = models.TextField(blank=True) 
     created_at = models.DateTimeField(auto_now_add=True)
     
     def __str__(self):
-        return f"Webhook - {self.student_email} - {self.file_name}"
+        return f"{self.project.student.student_id} - {self.file_type}"
+    

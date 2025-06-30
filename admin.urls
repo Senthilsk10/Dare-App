@@ -1,0 +1,17 @@
+/mails/ - list of sent mails with filter option to sort emails sent by admin
+
+/mails/<project_id>/ - list of sent mails with filter option to sort emails sent for a specific project
+
+/mails/approach/ - list of emails to be sent for each project that's due date is today - scanned by projects.get_Evaluators()
+    - from this site admin can create communication model by clicking send btn we fix , their which calls evaluator send button
+
+/mails/evaluation/ - show mails to be sent for assigned evaluators regarding the project thesis pdf submission.
+
+/mails/evaluation-remainder/ - show mails to be sent for assigned evaluators after 45 days of evaluation mail sent.
+
+mails/response/ - show mails that recieved from evaluators - fetch the project for the mail using referal id so the admin can work on that project to edit 
+    - allow admin to mark evaluator by accept or reject content in the mail if project has not have evaluators assigned. 
+
+
+
+in webhooklog model there is a processing error field available use this field to add  evaluation result in their for notifiing the users

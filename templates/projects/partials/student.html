@@ -1,0 +1,173 @@
+{% load custom_filters %}
+
+<!-- Processing Error Modal -->
+{% if project.processed and project.processing_error %}
+<div id="errorModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-bold text-red-600">Processing Error</h3>
+            <button onclick="document.getElementById('errorModal').classList.add('hidden')" class="text-gray-500 hover:text-gray-700">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-red-700">{{ project.processing_error }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="flex justify-end">
+            <button onclick="document.getElementById('errorModal').classList.add('hidden')" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors">
+                Close
+            </button>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="space-y-6">
+    <!-- Project Files Section -->
+    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <h3 class="text-xl font-semibold text-gray-800 mb-4">Project Files</h3>
+        {% if project.project_file %}
+            <div class="flex items-center justify-between bg-gray-50 p-4 rounded-md">
+                <div class="flex items-center">
+                    <svg class="w-8 h-8 text-blue-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    <div>
+                        <p class="font-medium text-gray-800">{{ project.project_file.name|slice:":30" }}{% if project.project_file.name|length > 30 %}...{% endif %}</p>
+                        <p class="text-sm text-gray-500">Uploaded on {{ project.updated_at|date:"M d, Y" }}</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <span class="px-3 py-1 text-sm rounded-full {% if project.guide_approved %}bg-green-100 text-green-800{% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                        {% if project.guide_approved %}
+                            Approved on {{ project.guide_approved_date|date:"M d, Y" }}
+                        {% else %}
+                            Pending Approval
+                        {% endif %}
+                    </span>
+                    <a href="{{ project.project_file.url }}" target="_blank" class="text-blue-600 hover:text-blue-800">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        {% else %}
+            <p class="text-gray-500 italic">No project file uploaded yet.</p>
+        {% endif %}
+    </div>
+
+    <!-- Synopsis Section -->
+    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-semibold text-gray-800">Synopsis</h3>
+            <a href="https://docs.google.com/forms/d/e/1FAIpQLSd8KcVJTqYgAJfZyNf8SUNRRf-kO7f7syfYe8IwLD1u6Z7nlQ/viewform?usp=pp_url&entry.14545404={{project.id}}" 
+               target="_blank" 
+               class="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Submit New Synopsis
+            </a>
+        </div>
+
+        {% with synopsis_files=project.webhooklog_set|filter_by:"file_type=SYNOPSIS" %}
+            {% if synopsis_files %}
+                <div class="space-y-3">
+                    {% for webhook in synopsis_files %}
+                        <div class="flex items-center justify-between bg-gray-50 p-4 rounded-md hover:bg-gray-100 transition-colors">
+                            <div class="flex items-center">
+                                <svg class="w-6 h-6 text-gray-500 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                                <span class="truncate">{{ webhook.file_name|default:"Synopsis File" }}</span>
+                            </div>
+                            <form action="#" method="post" class="ml-4 flex-shrink-0">
+                                {% csrf_token %}
+                                <button type="submit" 
+                                        class="text-red-600 hover:text-red-800 p-1 rounded-full hover:bg-red-50"
+                                        onclick="return confirm('Are you sure you want to delete this file?')">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                    </svg>
+                                </button>
+                            </form>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <div class="text-center py-4">
+                    <p class="text-gray-500 italic">No synopsis files found.</p>
+                </div>
+            {% endif %}
+        {% endwith %}
+    </div>
+</div>
+</div>
+<div>
+    <h3>Projects Files</h3>
+
+<div class="space-y-6">
+    <!-- Submit Synopsis Section -->
+    <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+        <h4 class="text-lg font-medium text-gray-700 mb-3">Submit Your Synopsis</h4>
+        <a href="https://docs.google.com/forms/d/e/1FAIpQLSeKHA3GI-HsAhGBZN3BFgo-2Gz_nU4pLKUKkU41kzrufZGsvw/viewform?usp=pp_url&entry.14545404={{project.id}}" 
+           target="_blank" 
+           class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            Submit Project
+        </a>
+    </div>
+
+    <!-- Synopsis Files Section -->
+    <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+        <h4 class="text-lg font-medium text-gray-700 mb-3">Synopsis Files</h4>
+        {% with project_files=project.webhooklog_set|filter_by:"file_type=PROJECT" %}
+            {% if project_files %}
+                <ul class="space-y-2">
+                    {% for webhook in project_files %}
+                        <li class="flex items-center justify-between bg-gray-50 p-3 rounded-md hover:bg-gray-100">
+                            <a href="https://drive.google.com/file/d/{{ webhook.file_id }}/view" 
+                               target="_blank" 
+                               class="text-blue-600 hover:text-blue-800 hover:underline flex items-center flex-grow">
+                                <svg class="w-5 h-5 mr-2 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                                <span class="truncate">{{ webhook.file_name|default:"Project File" }}</span>
+                            </a>
+                            <form action="#" method="post" class="ml-4 flex-shrink-0">
+                                {% csrf_token %}
+                                <button type="submit" 
+                                        class="text-red-600 hover:text-red-800 p-1 rounded-full hover:bg-red-50"
+                                        onclick="return confirm('Are you sure you want to delete this file?')">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                    </svg>
+                                </button>
+                            </form>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <div class="text-center py-4">
+                    <p class="text-gray-500 italic">No synopsis files found.</p>
+                </div>
+            {% endif %}
+        {% endwith %}
+    </div>
+</div>
+</div>

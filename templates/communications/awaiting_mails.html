@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="p-6">
+  <h2 class="text-xl font-semibold mb-4">Evaluators To Contact</h2>
+  <!-- Calendar container -->
+  <div id="calendar" class="mb-6"></div>
+
+  <!-- Legacy table kept hidden for reference -->
+  <table id="evaluators-table" style="display:none" class="display w-full">
+    <thead class="bg-gray-100">
+      <tr>
+        <th class="text-left px-4 py-2">Project</th>
+        <th class="text-left px-4 py-2">Type</th>
+        <th class="text-left px-4 py-2">Email</th>
+        <th class="text-left px-4 py-2">Last Sent</th>
+        <th class="text-left px-4 py-2">Status</th>
+        <th class="text-left px-4 py-2">Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in evaluator_rows %}
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-2">{{ row.project_title }}</td>
+          <td class="px-4 py-2">{{ row.type }}</td>
+          <td class="px-4 py-2">{{ row.email }}</td>
+          <td class="px-4 py-2">{{ row.last_email_date }}</td>
+          <td class="px-4 py-2">{{ row.status }}</td>
+          <td class="px-4 py-2">
+            
+            
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Modal -->
+<div id="email-modal" class="fixed inset-0 bg-gray-800 bg-opacity-50 hidden items-center justify-center z-50">
+  <div class="bg-white rounded-lg w-11/12 md:w-2/3 lg:w-1/2 max-h-[80vh] overflow-y-auto p-6 relative">
+    <button onclick="closeModal()" class="absolute top-2 right-4 text-gray-600 text-lg font-bold hover:text-red-600">&times;</button>
+    <h3 class="text-lg font-bold mb-2" id="modal-subject">Email Subject</h3>
+    <p class="text-sm mb-1 text-gray-700" id="modal-to"></p>
+    <p class="text-sm mb-1 text-gray-700" id="modal-evaluator-info"></p>
+    <hr class="my-2">
+    <div class="bg-gray-100 p-3 text-sm max-h-96 overflow-y-auto">
+      <pre class="whitespace-pre-wrap" id="modal-body"></pre>
+    </div>
+    <div class="mt-4 flex justify-end space-x-2">
+      <button onclick="closeModal()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">Cancel</button>
+      <button id="send-email-btn" onclick="sendEmailFromModal()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Send Email</button>
+    </div>
+  </div>
+</div>
+
+<!-- Loading indicator -->
+<div id="loading-indicator" class="fixed inset-0 bg-gray-800 bg-opacity-50 hidden items-center justify-center z-50">
+  <div class="bg-white p-6 rounded-lg">
+    <div class="flex items-center space-x-2">
+      <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+      <span>Sending email...</span>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+  <!-- FullCalendar -->
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+  <!-- jQuery + DataTables -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css" />
+  
+  <script>
+    // Parse the calendar events from Django context
+    const calendarEvents = {{ calendar_events|safe }};
+    
+    document.addEventListener('DOMContentLoaded', function() {
+      var calendarEl = document.getElementById('calendar');
+      var calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+        headerToolbar: {
+          left: 'prev,next today',
+          center: 'title',
+          right: 'dayGridMonth,timeGridWeek,timeGridDay'
+        },
+        events: calendarEvents,
+        eventClick: function(info) {
+          showEmailModal(info.event);
+        },
+        eventColor: '#3788d8',
+        eventTextColor: '#ffffff',
+        height: 'auto',
+        aspectRatio: 1.35
+      });
+      calendar.render();
+    });
+
+    function showEmailModal(event) {
+      var props = event.extendedProps;
+      var emailContent = props.email_content;
+      
+      // Set modal content
+      document.getElementById('modal-subject').textContent = emailContent.subject || 'Approach Email';
+      document.getElementById('modal-to').textContent = 'To: ' + props.evaluator_email;
+      document.getElementById('modal-evaluator-info').textContent = 
+        `Evaluator: ${event.title} | Type: ${props.evaluator_type}`;
+      document.getElementById('modal-body').textContent = emailContent.body || 'No content available';
+      
+      // Store the project_pool_id for sending email
+      document.getElementById('send-email-btn').setAttribute('data-pool-id', props.project_pool_id);
+      
+      // Show modal
+      document.getElementById('email-modal').classList.remove('hidden');
+      document.getElementById('email-modal').classList.add('flex');
+    }
+
+    function closeModal() {
+      document.getElementById('email-modal').classList.add('hidden');
+      document.getElementById('email-modal').classList.remove('flex');
+    }
+
+    function showLoading() {
+      document.getElementById('loading-indicator').classList.remove('hidden');
+      document.getElementById('loading-indicator').classList.add('flex');
+    }
+
+    function hideLoading() {
+      document.getElementById('loading-indicator').classList.add('hidden');
+      document.getElementById('loading-indicator').classList.remove('flex');
+    }
+
+    function sendEmailFromModal() {
+      var poolId = document.getElementById('send-email-btn').getAttribute('data-pool-id');
+      
+      if (!poolId) {
+        alert('Error: No evaluator pool ID found');
+        return;
+      }
+
+      // Show loading indicator
+      showLoading();
+      
+      // Get CSRF token
+      const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value || 
+                       document.querySelector('meta[name=csrf-token]').getAttribute('content');
+
+      fetch("{% url 'communications:send_email' %}", {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken,
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+          project_pool_id: parseInt(poolId)
+        })
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        hideLoading();
+        if (data.success) {
+          alert('Email sent successfully!');
+          closeModal();
+          // Optionally refresh the page or update the calendar
+          // location.reload();
+        } else {
+          alert('Error sending email: ' + (data.message || 'Unknown error'));
+        }
+      })
+      .catch(err => {
+        hideLoading();
+        console.error('Email sending error:', err);
+        alert('Network error occurred while sending email. Please try again.');
+      });
+    }
+
+    // Close modal when clicking outside
+    document.getElementById('email-modal').addEventListener('click', function(e) {
+      if (e.target === this) {
+        closeModal();
+      }
+    });
+
+    // Close modal with Escape key
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        closeModal();
+      }
+    });
+  </script>
+{% endblock %}

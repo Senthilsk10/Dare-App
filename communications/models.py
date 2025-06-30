@@ -1,8 +1,6 @@
 from django.db import models
 import uuid
-from projects.models import Project
-from users.models import Evaluator
-from django.contrib.auth.models import User
+from projects.models import ProjectEvaluatorPool,Project
 
 # Create your models here.
 class EmailCommunication(models.Model):
@@ -19,26 +17,17 @@ class EmailCommunication(models.Model):
     
     STATUS_CHOICES = [
         ('SENT', 'Sent'),
-        ('DELIVERED', 'Delivered'),
-        ('OPENED', 'Opened'),
-        ('REPLIED', 'Replied'),
-        ('ACCEPTED', 'Accepted'),
-        ('REJECTED', 'Rejected'),
-        ('BOUNCED', 'Bounced'),
+        ('NOT SENT', 'Not Sent'),
         ('FAILED', 'Failed'),
     ]
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='emails')
-    evaluator = models.ForeignKey(Evaluator, on_delete=models.CASCADE)
+    eval_pool = models.ForeignKey(ProjectEvaluatorPool, on_delete=models.CASCADE)
     email_type = models.CharField(max_length=20, choices=EMAIL_TYPE_CHOICES)
     subject = models.CharField(max_length=300)
     body = models.TextField()
     sent_date = models.DateTimeField() # fetch by if date not set to send these type of mails as considering it was waiting to send
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='SENT')
-    attempt_number = models.IntegerField(default=1, help_text="1st, 2nd, or 3rd attempt")
-    response_date = models.DateTimeField(null=True, blank=True)
-    response_content = models.TextField(blank=True)
     message_id = models.CharField(max_length=200, blank=True, help_text="Message Subject id we use to track the email")
     
     # Attachments tracking
@@ -49,8 +38,9 @@ class EmailCommunication(models.Model):
     class Meta:
         ordering = ['-sent_date']
     
+    
     def __str__(self):
-        return f"{self.project.student.student_id} -> {self.evaluator.name} ({self.email_type})"
+        return f"{self.eval_pool.project.student.student_id} -> {self.eval_pool.evaluator.name} ({self.email_type})"
 
 
 class AdminNotification(models.Model):

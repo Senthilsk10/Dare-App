@@ -24,7 +24,7 @@ def sync_student_user(sender, instance, created, **kwargs):
     else:
         # Update user on student update
         try:
-            user = User.objects.get(role='STUDENT', username=username)
+            user = User.objects.get(role='STUDENT', email=username)
             user.first_name = instance.email
             user.set_password(password)  # If student_id number changes, update password
             user.save()
@@ -39,7 +39,7 @@ def sync_student_user(sender, instance, created, **kwargs):
 
 @receiver(post_delete, sender=PhDStudent)
 def delete_student_user(sender, instance, **kwargs):
-    User.objects.filter(username=instance.mail, role='student').delete()
+    User.objects.filter(email=instance.email, role='student').delete()
 
 
 # ---------- GUIDE ----------
@@ -76,4 +76,4 @@ def sync_guide_user(sender, instance, created, **kwargs):
 
 @receiver(post_delete, sender=Guide)
 def delete_guide_user(sender, instance, **kwargs):
-    User.objects.filter(username=instance.email, role='guide').delete()
+    User.objects.filter(email=instance.email, role=User.Role.GUIDE).delete()
