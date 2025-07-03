@@ -68,14 +68,17 @@ class Project(models.Model):
     referel_id = models.CharField(max_length=20, blank=True)
     
     
+    def get_assigned_evaluators(self):
+        return [self.assigned_foreign_evaluator, self.assigned_indian_evaluator]
+    
     def get_calender_evaluators(self):
         foreign = self.evaluator_pool.filter(evaluator__evaluator_type='FOREIGN', retry_count__lt=3).order_by('-priority_order').first()
         indian = self.evaluator_pool.filter(evaluator__evaluator_type='INDIAN', retry_count__lt=3).order_by('-priority_order').first()
-        return [foreign, indian]
+        return [foreign, indian]    
             
     
     
-    def get_evaluators(self):
+    def get_evaluators(self):   
         # Get evaluators, marking whether they are assigned (selected) or from pool (unselected)
         f_mail_send = False
         i_mail_send = False
@@ -154,8 +157,11 @@ class ProjectEvaluatorPool(models.Model):
     assigned_date = models.DateTimeField(auto_now_add=True)
     priority_order = models.IntegerField(help_text="1-5 for each type (foreign/indian) & Higher score = higher priority")
     retry_count = models.IntegerField(default=0)
+    report_retry_count = models.IntegerField(default=0, help_text="Retry count for project submission emails")
     last_email_date = models.DateTimeField(null=True, blank=True)
+    report_last_email_date = models.DateTimeField(null=True, blank=True)
     next_email_date = models.DateTimeField(null=True, blank=True)
+    report_next_email_date = models.DateTimeField(null=True, blank=True)
     
     class Meta:
         unique_together = ['project', 'evaluator']
@@ -173,6 +179,17 @@ class ProjectEvaluatorPool(models.Model):
     def update_next_email_date(self):
         self.next_email_date = timezone.now() + timezone.timedelta(days=15)
         self.save()
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Auto-unassign evaluator after 3 report retries
+        if getattr(self, "report_retry_count", 0) >= 3:
+            project = self.project
+            if self.evaluator.evaluator_type == "FOREIGN":
+                project.assigned_foreign_evaluator = None
+            else:
+                project.assigned_indian_evaluator = None
+            project.save()
     
     def __str__(self):
         return f"{self.project.student.student_id} - {self.evaluator

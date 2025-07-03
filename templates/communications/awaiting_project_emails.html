@@ -1,32 +1,31 @@
 {% extends "base.html" %}
 
 {% block content %}
-
-
 <div class="p-6">
   <div class="flex justify-between items-center mb-4">
     <h2 class="text-xl font-semibold">Project Evaluators To Contact</h2>
     <div class="space-x-2">
-      <a href="#" class="px-3 py-1 rounded bg-blue-600 text-white">
+      <a href="{% url 'communications:awaiting_mails' %}" class="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300">
         Regular Evaluators
       </a>
-      <a href="{% url 'communications:awaiting_project_emails' %}" class="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-dark">
+      <a href="#" class="px-3 py-1 rounded bg-blue-600 text-white">
         Project Evaluators
       </a>
     </div>
   </div>
+  
   <!-- Calendar container -->
   <div id="calendar" class="mb-6"></div>
 
-  <!-- Legacy table kept hidden for reference -->
-  <table id="evaluators-table" style="display:none" class="display w-full">
+  <!-- Table for mobile view -->
+  <table id="evaluators-table" class="display w-full">
     <thead class="bg-gray-100">
       <tr>
         <th class="text-left px-4 py-2">Project</th>
         <th class="text-left px-4 py-2">Type</th>
         <th class="text-left px-4 py-2">Email</th>
         <th class="text-left px-4 py-2">Last Sent</th>
-        <th class="text-left px-4 py-2">Status</th>
+        <th class="text-left px-4 py-2">Retry Count</th>
         <th class="text-left px-4 py-2">Action</th>
       </tr>
     </thead>
@@ -36,11 +35,24 @@
           <td class="px-4 py-2">{{ row.project_title }}</td>
           <td class="px-4 py-2">{{ row.type }}</td>
           <td class="px-4 py-2">{{ row.email }}</td>
-          <td class="px-4 py-2">{{ row.last_email_date }}</td>
-          <td class="px-4 py-2">{{ row.status }}</td>
+          <td class="px-4 py-2">{{ row.last_email_date|date:"M d, Y"|default:"Never" }}</td>
+          <td class="px-4 py-2">{{ row.retry_count }}/3</td>
           <td class="px-4 py-2">
-            
-            
+            <button onclick="showEmailModal({
+              title: '{{ row.evaluator_name|escapejs }}',
+              extendedProps: {
+                evaluator_email: '{{ row.email|escapejs }}',
+                evaluator_type: '{{ row.type|escapejs }}',
+                project_pool_id: '{{ row.pool_id|escapejs }}',
+                email_content: {
+                  subject: '{{ row.email_subject|escapejs }}',
+                  body: `{{ row.email_body|escapejs }}`
+                }
+              }
+            })" 
+            class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">
+              View & Send
+            </button>
           </td>
         </tr>
       {% endfor %}
@@ -52,16 +64,17 @@
 <div id="email-modal" class="fixed inset-0 bg-gray-800 bg-opacity-50 hidden items-center justify-center z-50">
   <div class="bg-white rounded-lg w-11/12 md:w-2/3 lg:w-1/2 max-h-[80vh] overflow-y-auto p-6 relative">
     <button onclick="closeModal()" class="absolute top-2 right-4 text-gray-600 text-lg font-bold hover:text-red-600">&times;</button>
-    <h3 class="text-lg font-bold mb-2" id="modal-subject">Email Subject</h3>
+    <h3 class="text-lg font-bold mb-2" id="modal-subject">Project Submission Email</h3>
     <p class="text-sm mb-1 text-gray-700" id="modal-to"></p>
     <p class="text-sm mb-1 text-gray-700" id="modal-evaluator-info"></p>
+    <p class="text-sm mb-1 text-gray-700">This is a project submission email. The evaluator will receive the project file as an attachment.</p>
     <hr class="my-2">
     <div class="bg-gray-100 p-3 text-sm max-h-96 overflow-y-auto">
       <pre class="whitespace-pre-wrap" id="modal-body"></pre>
     </div>
     <div class="mt-4 flex justify-end space-x-2">
       <button onclick="closeModal()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">Cancel</button>
-      <button id="send-email-btn" onclick="sendEmailFromModal()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Send Email</button>
+      <button id="send-email-btn" onclick="sendProjectEmail()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Send Project Email</button>
     </div>
   </div>
 </div>
@@ -71,11 +84,10 @@
   <div class="bg-white p-6 rounded-lg">
     <div class="flex items-center space-x-2">
       <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-      <span>Sending email...</span>
+      <span>Sending email with project attachment...</span>
     </div>
   </div>
 </div>
-
 {% endblock %}
 
 {% block extra_js %}
@@ -92,39 +104,52 @@
     const calendarEvents = {{ calendar_events|safe }};
     
     document.addEventListener('DOMContentLoaded', function() {
-      var calendarEl = document.getElementById('calendar');
-      var calendar = new FullCalendar.Calendar(calendarEl, {
-        initialView: 'dayGridMonth',
-        headerToolbar: {
-          left: 'prev,next today',
-          center: 'title',
-          right: 'dayGridMonth,timeGridWeek,timeGridDay'
-        },
-        events: calendarEvents,
-        eventClick: function(info) {
-          showEmailModal(info.event);
-        },
-        eventColor: '#3788d8',
-        eventTextColor: '#ffffff',
-        height: 'auto',
-        aspectRatio: 1.35
+      // Initialize DataTable
+      $('#evaluators-table').DataTable({
+        responsive: true,
+        order: [[3, 'asc']], // Sort by last sent date by default
+        pageLength: 25
       });
-      calendar.render();
+      
+      // Initialize calendar
+      var calendarEl = document.getElementById('calendar');
+      if (calendarEl) {
+        var calendar = new FullCalendar.Calendar(calendarEl, {
+          initialView: 'dayGridMonth',
+          headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,timeGridWeek,timeGridDay'
+          },
+          events: calendarEvents,
+          eventClick: function(info) {
+            showEmailModal(info.event);
+          },
+          eventColor: '#4f46e5',
+          eventTextColor: '#ffffff',
+          height: 'auto',
+          aspectRatio: 1.35
+        });
+        calendar.render();
+      }
     });
 
     function showEmailModal(event) {
-      var props = event.extendedProps;
-      var emailContent = props.email_content;
+      var props = event.extendedProps || {};
+      var emailContent = props.email_content || {};
       
       // Set modal content
-      document.getElementById('modal-subject').textContent = emailContent.subject || 'Approach Email';
-      document.getElementById('modal-to').textContent = 'To: ' + props.evaluator_email;
+      document.getElementById('modal-subject').textContent = emailContent.subject || 'Project Submission Email';
+      document.getElementById('modal-to').textContent = 'To: ' + (props.evaluator_email || '');
       document.getElementById('modal-evaluator-info').textContent = 
-        `Evaluator: ${event.title} | Type: ${props.evaluator_type}`;
+        `Evaluator: ${event.title || 'N/A'} | Type: ${props.evaluator_type || 'N/A'}`;
       document.getElementById('modal-body').textContent = emailContent.body || 'No content available';
       
       // Store the project_pool_id for sending email
-      document.getElementById('send-email-btn').setAttribute('data-pool-id', props.project_pool_id);
+      const sendBtn = document.getElementById('send-email-btn');
+      if (props.project_pool_id) {
+        sendBtn.setAttribute('data-pool-id', props.project_pool_id);
+      }
       
       // Show modal
       document.getElementById('email-modal').classList.remove('hidden');
@@ -146,8 +171,9 @@
       document.getElementById('loading-indicator').classList.remove('flex');
     }
 
-    function sendEmailFromModal() {
-      var poolId = document.getElementById('send-email-btn').getAttribute('data-pool-id');
+    function sendProjectEmail() {
+      const sendBtn = document.getElementById('send-email-btn');
+      const poolId = sendBtn.getAttribute('data-pool-id');
       
       if (!poolId) {
         alert('Error: No evaluator pool ID found');
@@ -158,13 +184,10 @@
       showLoading();
       
       // Get CSRF token
-      const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value || 
-                       document.querySelector('meta[name=csrf-token]').getAttribute('content');
+      const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+                       document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || '';
 
-      const isProject = new URLSearchParams(window.location.search).get('project') === 'true';
-      const url = isProject ? "{% url 'communications:send_project_email' %}" : "{% url 'communications:send_email' %}";
-
-      fetch(url, {
+      fetch("{% url 'communications:send_project_email' %}", {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -184,18 +207,18 @@
       .then(data => {
         hideLoading();
         if (data.success) {
-          alert('Email sent successfully!');
+          alert('Project submission email sent successfully!');
           closeModal();
-          // Optionally refresh the page or update the calendar
+          // Reload to update the UI
           location.reload();
         } else {
-          alert('Error sending email: ' + (data.message || 'Unknown error'));
+          throw new Error(data.error || 'Failed to send email');
         }
       })
       .catch(err => {
         hideLoading();
         console.error('Email sending error:', err);
-        alert('Network error occurred while sending email. Please try again.');
+        alert(`Error: ${err.message || 'Failed to send project submission email. Please try again.'}`);
       });
     }
 

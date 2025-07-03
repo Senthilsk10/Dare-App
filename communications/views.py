@@ -11,6 +11,7 @@ from django.utils import timezone
 from datetime import timedelta
 from .models import EmailCommunication
 from .gmail_utils import send_mail_with_attachments, GoogleServiceManager, send_simple_email
+from communications.utils import send_thesis_submission_email
  
 # Django Views
 from django.shortcuts import render
@@ -56,6 +57,18 @@ def send_email_view(request):
     return render(request, 'communications/send_email.html')
  
  
+# Router view to switch between regular awaiting emails and project submission awaiting emails based on ?project=true query string
+
+def awaiting_emails(request):
+    """Route to the correct awaiting-emails view based on query string.
+
+    If ?project=true is present, show the project-submission email list,
+    otherwise default to the normal awaiting_emails_v2 list.
+    """
+    if request.GET.get('project', '').lower() == 'true':
+        return awaiting_project_emails(request)
+    return awaiting_emails_v2(request)
+
 def awaiting_emails_v2(request):
     projects = Project.objects.filter(status='SYNOPSIS_APPROVED')
     evaluator_rows = []
@@ -171,3 +184,131 @@ def send_email(request):
                 error_message=error_message
             )
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@require_POST
+@csrf_exempt
+def send_project_email(request):
+    """Send project submission / evaluation reminder email"""
+    data = json.loads(request.body)
+    pool_id = data.get('project_pool_id')
+    pool = get_object_or_404(ProjectEvaluatorPool, id=pool_id)
+
+    # generate email (reminder if already sent before)
+    latest_comm = EmailCommunication.objects.filter(eval_pool=pool, email_type='PROJECT_SUBMISSION').order_by('-sent_date').first()
+    reminder = bool(latest_comm)
+    email_dict = send_thesis_submission_email(pool.project, pool, reminder=reminder)
+    file_id = WebhookLog.objects.filter(project=pool.project,file_type="PROJECT").first().file_id
+    try:
+        message_id = send_mail_with_attachments(
+            request,
+            email_dict['to'],
+            email_dict['subject'],
+            email_dict['body'],
+            drive_file_ids=[file_id]
+        )
+
+        EmailCommunication.objects.create(
+            eval_pool=pool,
+            email_type='PROJECT_SUBMISSION',
+            subject=email_dict['subject'],
+            body=email_dict['body'],
+            sent_date=timezone.now(),
+            message_id=message_id
+        )
+
+        pool.report_retry_count += 1
+        pool.report_last_email_date = timezone.now()
+        pool.report_next_email_date = timezone.now() + timedelta(days=45)
+        pool.save()
+        return JsonResponse({'success': True, 'result': message_id})
+    except Exception as e:
+        EmailCommunication.objects.create(
+            eval_pool=pool,
+            email_type='PROJECT_SUBMISSION',
+            subject=email_dict.get('subject', ''),
+            body=email_dict.get('body', ''),
+            sent_date=timezone.now(),
+            status='FAILED',
+            error_message=str(e)
+        )
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+    
+def awaiting_project_emails(request):
+    """View to list evaluators awaiting project-submission mails (45-day cadence)"""
+    projects = Project.objects.filter(status='UNDER_EVALUATION')
+    evaluator_rows, calendar_events = [], []
+
+    for project in projects:
+        # consider ALL evaluators in pool that are still active and below 3 retries
+        for evaluator_pool in project.evaluator_pool.filter(report_retry_count__lt=3,evaluator__in=[project.assigned_foreign_evaluator,project.assigned_indian_evaluator]):
+            if evaluator_pool.evaluator is None:
+                continue
+            
+            print("evaluator_pool",evaluator_pool)
+
+            latest_comm = EmailCommunication.objects.filter(
+                eval_pool=evaluator_pool,
+                email_type='PROJECT_SUBMISSION'
+            ).order_by('-sent_date').first()
+
+            need_email = False
+            reminder = False
+            last_email_date_str = "Never"
+
+            if not latest_comm:
+                need_email = True  # never sent before
+            else:
+                last_email_date_str = latest_comm.sent_date.strftime('%Y-%m-%d %H:%M:%S')
+                if (timezone.now() - latest_comm.sent_date).days >= 45:
+                    need_email = True
+                    reminder = True
+            # print("need_email",need_email)
+            # print("reminder",reminder)
+
+            email_content = send_thesis_submission_email(project, evaluator_pool, reminder=reminder)
+            # email_content = email_preview.get('body', '')
+            # print("email_content",email_content)
+
+            evaluator_rows.append({
+                "project_title": project.title,
+                "project_id": str(project.id),
+                "type": evaluator_pool.evaluator.evaluator_type,
+                "email": evaluator_pool.evaluator.email,
+                "name": evaluator_pool.evaluator.name,
+                "specialization": evaluator_pool.evaluator.specialization,
+                "country": evaluator_pool.evaluator.country,
+                "last_email_date": last_email_date_str,
+                "email_content": email_content,
+                "project_pool_id": evaluator_pool.id,
+                "priority_order": evaluator_pool.priority_order,
+                "report_retry_count": evaluator_pool.report_retry_count
+            })
+
+            start_date = evaluator_pool.report_next_email_date or timezone.now()
+            calendar_events.append({
+                "id": f"{project.id}_{evaluator_pool.id}",
+                "title": f"{evaluator_pool.evaluator.name} - {project.title}",
+                "start": start_date.isoformat(),
+                "allDay": True,
+                "extendedProps": {
+                    "evaluator_email": evaluator_pool.evaluator.email,
+                    "project_title": project.title,
+                    "evaluator_type": evaluator_pool.evaluator.evaluator_type,
+                    "email_content": email_content,
+                    "project_pool_id": evaluator_pool.id
+                }
+            })
+
+    # AJAX
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'evaluators': evaluator_rows, 'calendar_events': calendar_events})
+
+    print("evaluator_rows",evaluator_rows)
+    print("calendar_events",calendar_events)
+    return render(request, 'communications/awaiting_project_emails.html', {
+        'evaluator_rows': evaluator_rows,
+        'evaluator_rows_json': json.dumps(evaluator_rows),
+        'calendar_events': json.dumps(calendar_events)
+    })
+    

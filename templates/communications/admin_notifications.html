@@ -1,0 +1,510 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+
+<!-- Add this style to hide content until Angular is ready -->
+<style>
+    [ng-cloak] {
+        display: none !important;
+    }
+</style>
+
+<div class="bg-gray-50" ng-app="notificationApp" ng-controller="NotificationController" ng-cloak>
+    <!-- Loading overlay that shows until Angular is ready -->
+    <div id="angular-loading" class="fixed inset-0 bg-white bg-opacity-90 flex items-center justify-center z-50">
+        <div class="text-center">
+            <i class="fas fa-spinner fa-spin text-4xl text-blue-600 mb-4"></i>
+            <p class="text-gray-700 text-lg">Loading application...</p>
+        </div>
+    </div>
+
+    <div class="container mx-auto px-4 py-6">
+        <!-- Rest of your template remains the same -->
+        <!-- Header -->
+        <div class="bg-white rounded-lg shadow-sm border mb-6">
+            <div class="px-6 py-4 border-b">
+                <h1 class="text-2xl font-bold text-gray-900">
+                    <i class="fas fa-bell mr-2 text-blue-600"></i>
+                    Admin Notifications
+                </h1>
+            </div>
+            
+            <!-- Filters -->
+            <div class="px-6 py-4 bg-gray-50 border-b">
+                <div class="flex flex-wrap gap-4 items-center">
+                    <div class="flex items-center space-x-2">
+                        <label class="text-sm font-medium text-gray-700">From Date:</label>
+                        <input type="date" ng-model="filters.fromDate" class="border rounded px-3 py-1 text-sm">
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <label class="text-sm font-medium text-gray-700">To Date:</label>
+                        <input type="date" ng-model="filters.toDate" class="border rounded px-3 py-1 text-sm">
+                    </div>
+                    <button ng-click="applyFilters()" class="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700">
+                        <i class="fas fa-filter mr-1"></i>Apply Filters
+                    </button>
+                    <button ng-click="clearFilters()" class="bg-gray-500 text-white px-4 py-2 rounded text-sm hover:bg-gray-600">
+                        <i class="fas fa-times mr-1"></i>Clear
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="px-6">
+                <div class="flex border-b">
+                    <button ng-click="setActiveTab('unread')" 
+                            ng-class="{'border-b-2 border-blue-600 text-blue-600': activeTab === 'unread', 'text-gray-600': activeTab !== 'unread'}"
+                            class="px-4 py-3 font-medium text-sm focus:outline-none">
+                        <i class="fas fa-envelope mr-2"></i>
+                        Unread ([[unreadCount]])
+                    </button>
+                    <button ng-click="setActiveTab('read')" 
+                            ng-class="{'border-b-2 border-blue-600 text-blue-600': activeTab === 'read', 'text-gray-600': activeTab !== 'read'}"
+                            class="px-4 py-3 font-medium text-sm focus:outline-none ml-6">
+                        <i class="fas fa-envelope-open mr-2"></i>
+                        Read ([[readCount]])
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Spinner -->
+        <div ng-show="loading" class="text-center py-8">
+            <i class="fas fa-spinner fa-spin text-2xl text-blue-600"></i>
+            <p class="text-gray-600 mt-2">Loading notifications...</p>
+        </div>
+
+        <!-- Notifications List -->
+        <div ng-hide="loading" class="bg-white rounded-lg shadow-sm border">
+            <!-- Empty State -->
+            <div ng-show="notifications.length === 0" class="text-center py-12">
+                <i class="fas fa-inbox text-4xl text-gray-400 mb-4"></i>
+                <h3 class="text-lg font-medium text-gray-900 mb-2">No notifications found</h3>
+                <p class="text-gray-600">[[activeTab === 'unread' ? 'All caught up! No unread notifications.' : 'No read notifications to display.']]</p>
+            </div>
+
+            <!-- Notification Items -->
+            <div class="divide-y">
+                <div ng-repeat="notification in notifications" 
+                     ng-click="openModal(notification)"
+                     class="px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors duration-150"
+                     ng-class="{'bg-blue-50 border-l-4 border-l-blue-500': !notification.is_read}">
+                    
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center space-x-2 mb-2">
+                                <!-- Notification Type -->
+                                <span class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">
+                                    [[getNotificationTypeDisplay(notification.notification_type)]]
+                                </span>
+                                
+                                <!-- Unread Indicator -->
+                                <span ng-show="!notification.is_read" class="w-2 h-2 bg-blue-600 rounded-full"></span>
+                            </div>
+                            
+                            <h3 class="text-lg font-semibold text-gray-900 mb-1" ng-class="{'font-bold': !notification.is_read}">
+                                [[notification.title]]
+                            </h3>
+                            
+                            <p class="text-sm text-gray-600 mb-2">
+                                <i class="fas fa-envelope mr-1"></i>
+                                From: [[notification.from_email]]
+                            </p>
+                            
+                            <p class="text-sm text-gray-700 line-clamp-2">
+                                [[notification.message | limitTo:150]][[notification.message.length > 150 ? '...' : '']]
+                            </p>
+                        </div>
+                        
+                        <div class="flex flex-col items-end space-y-2 ml-4">
+                            <span class="text-xs text-gray-500">
+                                [[formatDate(notification.created_at)]]
+                            </span>
+                            <i class="fas fa-chevron-right text-gray-400"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        <div ng-show="totalPages > 1" class="mt-6 flex justify-center">
+            <nav class="inline-flex rounded-md shadow">
+                <button ng-click="goToPage(currentPage - 1)" 
+                        ng-disabled="currentPage <= 1"
+                        class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-l-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                
+                <button ng-repeat="page in getPageRange()" 
+                        ng-click="goToPage(page)"
+                        ng-class="{'bg-blue-600 text-white': page === currentPage, 'bg-white text-gray-700 hover:bg-gray-50': page !== currentPage}"
+                        class="px-3 py-2 text-sm font-medium border-t border-b border-gray-300">
+                    [[page]]
+                </button>
+                
+                <button ng-click="goToPage(currentPage + 1)" 
+                        ng-disabled="currentPage >= totalPages"
+                        class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-r-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </nav>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div ng-show="showModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" ng-click="closeModal($event)">
+        <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto" ng-click="$event.stopPropagation()">
+            <!-- Modal Header -->
+            <div class="px-6 py-4 border-b bg-gray-50">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-xl font-bold text-gray-900">Notification Details</h2>
+                    <button ng-click="closeModal()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Modal Content -->
+            <div class="px-6 py-4" ng-show="selectedNotification">
+                <!-- Notification Info -->
+                <div class="mb-6">
+                    <div class="flex items-center space-x-2 mb-3">
+                        <span class="px-3 py-1 text-sm font-medium rounded-full"
+                              ng-class="{
+                                  'bg-red-100 text-red-800': selectedNotification.priority === 'URGENT',
+                                  'bg-orange-100 text-orange-800': selectedNotification.priority === 'HIGH',
+                                  'bg-yellow-100 text-yellow-800': selectedNotification.priority === 'MEDIUM',
+                                  'bg-green-100 text-green-800': selectedNotification.priority === 'LOW'
+                              }">
+                            [[selectedNotification.priority]]
+                        </span>
+                        <span class="text-sm text-gray-600">[[formatDate(selectedNotification.created_at)]]</span>
+                    </div>
+                    
+                    <h3 class="text-xl font-bold text-gray-900 mb-2">[[selectedNotification.title]]</h3>
+                    
+                    <p class="text-sm text-gray-600 mb-4">
+                        <i class="fas fa-envelope mr-2"></i>
+                        From: [[selectedNotification.from_email]]
+                    </p>
+                    
+                    <div class="bg-gray-50 rounded-lg p-4 mb-6">
+                        <p class="text-gray-800 whitespace-pre-wrap">[[selectedNotification.message]]</p>
+                    </div>
+                </div>
+
+                <!-- Assignment Form -->
+                <div class="border-t pt-6">
+                    <h4 class="text-lg font-semibold text-gray-900 mb-4">Assignment Details</h4>
+                    
+                    <form ng-submit="updateNotification()" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Assign to Project <span class="text-red-500">*</span>
+                            </label>
+                            <select ng-model="assignmentData.project_id" required
+                                    class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">Select a project...</option>
+                                <option ng-repeat="project in projects" value="[[project.id]]">
+                                   [[project.referel_id]] - [[project.title]] - [[project.student_roll]] ([[project.department]])
+                                </option>
+                            </select>
+                        </div>
+                        
+                        <!-- Assign Evaluator Checkbox -->
+                        <div class="flex items-center mb-2">
+                            <input type="checkbox" id="assignEvaluator" ng-model="assignmentData.assign_evaluator" class="mr-2">
+                            <label for="assignEvaluator" class="text-sm text-gray-700">Assign evaluator for this project (Evaluator agreed to evaluate)</label>
+                        </div>
+                        <!-- Reject Checkbox -->
+                        <div class="flex items-center mb-2">
+                            <input type="checkbox" id="rejectRequest" ng-model="assignmentData.reject_request" class="mr-2">
+                            <label for="rejectRequest" class="text-sm text-gray-700">Reject this request to work on the Evaluation (will be removed from mailing list and assigned evaluators)</label>
+                        </div>
+                        <!-- Evaluator found errors -->
+                        <div class="flex items-center mb-2">
+                            <input type="checkbox" id="foundErrors" ng-model="assignmentData.found_errors" class="mr-2">
+                            <label for="foundErrors" class="text-sm text-gray-700">Evaluator found errors in evaluation (project file will be marked with error and student notified.) </label>
+                        </div>
+                        <div ng-show="assignmentData.found_errors" class="ml-6 mb-2">
+                            <label class="block text-xs text-gray-600 mb-1">Message to student (from evaluator):</label>
+                            <textarea ng-model="assignmentData.evaluator_message" rows="2" class="w-full border rounded p-2 mb-2"></textarea>
+                            <div class="flex items-center mb-2">
+                                <input type="checkbox" id="includeAttachment" ng-model="assignmentData.include_attachment" class="mr-2">
+                                <label for="includeAttachment" class="text-xs text-gray-700">Include attachment for student(if any attachments to be send)</label>
+                            </div>
+                        </div>
+                        <!-- Evaluator found no errors -->
+                        <div class="flex items-center mb-2">
+                            <input type="checkbox" id="noErrors" ng-model="assignmentData.no_errors" class="mr-2">
+                            <label for="noErrors" class="text-sm text-gray-700">Evaluator found no errors (project file will be marked as completed and moved to viva)</label>
+                        </div>
+                        <!-- Payment enquiry -->
+                        <div class="flex items-center mb-2">
+                            <input type="checkbox" id="paymentEnquiry" ng-model="assignmentData.payment_enquiry" class="mr-2">
+                            <label for="paymentEnquiry" class="text-sm text-gray-700">Evaluator enquired about payment (set payment status to pending)</label>
+                        </div>
+
+                        <div class="flex justify-end space-x-3 pt-4">
+                            <button type="button" ng-click="closeModal()" 
+                                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300">
+                                Cancel
+                            </button>
+                            <button type="submit" ng-disabled="updating"
+                                    class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50">
+                                <i ng-show="updating" class="fas fa-spinner fa-spin mr-2"></i>
+                                [[updating ? 'Updating...' : 'Mark as Read & Assign']]
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Move the script to the end of the body -->
+<script>
+    // Wait for the DOM to be fully loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        // Check if Angular is loaded
+        function checkAngular() {
+            if (window.angular) {
+                // Initialize your app
+                var notificationApp = angular.module('notificationApp', []);
+                
+                // Configure interpolation symbols
+                notificationApp.config(function($interpolateProvider) {
+                    $interpolateProvider.startSymbol('[[');
+                    $interpolateProvider.endSymbol(']]');
+                });
+                
+                // Your controller code
+                notificationApp.controller('NotificationController', ['$scope', '$http', function($scope, $http) {
+                    // Initialize variables
+                    $scope.activeTab = 'unread';
+                    $scope.notifications = [];
+                    $scope.projects = [];
+                    $scope.currentPage = 1;
+                    $scope.totalPages = 1;
+                    $scope.pageSize = 10;
+                    $scope.loading = false;
+                    $scope.showModal = false;
+                    $scope.selectedNotification = null;
+                    $scope.updating = false;
+                    $scope.unreadCount = 0;
+                    $scope.readCount = 0;
+
+                    
+                    $scope.filters = {
+                        fromDate: '',
+                        toDate: '',
+                        priority: ''
+                    };
+                    
+                    $scope.assignmentData = {
+                        project_id: '',
+                        notification_type: ''
+                    };
+
+                    // API endpoints
+                    const API_BASE = '/api';
+                    const NOTIFICATIONS_URL = `${API_BASE}/admin-notifications/`;
+                    const PROJECTS_URL = `${API_BASE}/projects/`;
+
+                    // Load initial data
+                    $scope.init = function() {
+                        $scope.loadProjects();
+                        $scope.loadNotifications();
+                        $scope.loadCounts();
+                    };
+
+                    // Load projects for dropdown
+                    $scope.loadProjects = function(email='') {
+                        $http.get(PROJECTS_URL, { params: { email: email } }).then(function(response) {
+                            $scope.projects = response.data.results || response.data;
+                        }).catch(function(error) {
+                            console.error('Error loading projects:', error);
+                        });
+                    };
+
+                    // Load notification counts
+                    $scope.loadCounts = function() {
+                        $http.get(`${NOTIFICATIONS_URL}counts/`).then(function(response) {
+                            $scope.unreadCount = response.data.unread_count || 0;
+                            $scope.readCount = response.data.read_count || 0;
+                        }).catch(function(error) {
+                            console.error('Error loading counts:', error);
+                        });
+                    };
+
+                    // Load notifications with pagination and filters
+                    $scope.loadNotifications = function() {
+                        $scope.loading = true;
+                        
+                        let params = {
+                            page: $scope.currentPage,
+                            page_size: $scope.pageSize,
+                            is_read: $scope.activeTab === 'read'
+                        };
+
+                        // Add filters
+                        if ($scope.filters.fromDate) params.from_date = $scope.filters.fromDate;
+                        if ($scope.filters.toDate) params.to_date = $scope.filters.toDate;
+                        if ($scope.filters.priority) params.priority = $scope.filters.priority;
+
+                        $http.get(NOTIFICATIONS_URL, { params: params }).then(function(response) {
+                            $scope.notifications = response.data.results || [];
+                            $scope.totalPages = Math.ceil((response.data.count || 0) / $scope.pageSize);
+                            $scope.loading = false;
+                        }).catch(function(error) {
+                            console.error('Error loading notifications:', error);
+                            $scope.loading = false;
+                        });
+                    };
+
+                    // Tab management
+                    $scope.setActiveTab = function(tab) {
+                        $scope.activeTab = tab;
+                        $scope.currentPage = 1;
+                        $scope.loadNotifications();
+                    };
+
+                    // Pagination
+                    $scope.goToPage = function(page) {
+                        if (page >= 1 && page <= $scope.totalPages) {
+                            $scope.currentPage = page;
+                            $scope.loadNotifications();
+                        }
+                    };
+
+                    $scope.getPageRange = function() {
+                        let range = [];
+                        let start = Math.max(1, $scope.currentPage - 2);
+                        let end = Math.min($scope.totalPages, $scope.currentPage + 2);
+                        
+                        for (let i = start; i <= end; i++) {
+                            range.push(i);
+                        }
+                        return range;
+                    };
+
+                    // Filters
+                    $scope.applyFilters = function() {
+                        $scope.currentPage = 1;
+                        $scope.loadNotifications();
+                    };
+
+                    $scope.clearFilters = function() {
+                        $scope.filters = {
+                            fromDate: '',
+                            toDate: '',
+                            priority: ''
+                        };
+                        $scope.applyFilters();
+                    };
+
+                    // Modal management
+                    $scope.openModal = function(notification) {
+                        console.log("Selected from a list", notification);
+                        $scope.loadProjects(notification.from_email);
+                        $scope.selectedNotification = notification;
+                        $scope.showModal = true;
+                        $scope.assignmentData = {
+                            project_id: notification.project_id || '',
+                            notification_type: notification.notification_type
+                        };
+                    };
+
+                    $scope.closeModal = function(event) {
+                        if (event && event.target !== event.currentTarget) return;
+                        $scope.showModal = false;
+                        $scope.selectedNotification = null;
+                        $scope.assignmentData = {
+                            project_id: '',
+                            notification_type: ''
+                        };
+                    };
+
+                    // Update notification
+                    $scope.updateNotification = function() {
+                        if (!$scope.selectedNotification) return;
+                        
+                        $scope.updating = true;
+                        data = {
+                            ...$scope.assignmentData,
+                            id:$scope.selectedNotification.id,
+                            email:$scope.selectedNotification.from_email,
+                            is_read:true
+                        }
+                        $http.patch(`${NOTIFICATIONS_URL}${$scope.selectedNotification.id}/`, data)
+                        .then(function(response) {
+                            // Update the notification in the list
+                            const index = $scope.notifications.findIndex(n => n.id === $scope.selectedNotification.id);
+                            if (index !== -1) {
+                                $scope.notifications[index] = response.data;
+                            }
+                            
+                            // Refresh counts and lists
+                            $scope.loadCounts();
+                            $scope.loadNotifications();
+                            
+                            $scope.closeModal();
+                            $scope.updating = false;
+                            
+                            // Show success message
+                            alert('Notification updated successfully!');
+                        }).catch(function(error) {
+                            console.error('Error updating notification:', error);
+                            $scope.updating = false;
+                            alert('Error updating notification. Please try again.');
+                        });
+                    };
+
+                    // Utility functions
+                    $scope.formatDate = function(dateString) {
+                        const date = new Date(dateString);
+                        const now = new Date();
+                        const diffTime = Math.abs(now - date);
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                        
+                        if (diffDays === 1) return 'Today';
+                        if (diffDays === 2) return 'Yesterday';
+                        if (diffDays <= 7) return `${diffDays - 1} days ago`;
+                        
+                        return date.toLocaleDateString();
+                    };
+
+                    $scope.getNotificationTypeDisplay = function(type) {
+                        const typeMap = {
+                            'EVALUATOR_CONFIRMED': 'Evaluator Confirmed', // to show evaluator is accepted for the evaluation
+                            'UNDER_EVALUATION': 'Under Evaluation', // to show that the evaluator was evaluated the project but have some errors
+                            'EVALUATION_COMPLETED': 'Evaluation Completed', // to show that the evaluator was evaluated the project and completed the evaluation without error
+                            'PAYMENT_PENDING': 'Payment to Evaluator Pending', //to show the evaluator has sent a payment request to the admin
+                            'COMPLETED': 'Project Completed', // to show that the project is completed with payment confirmation too.
+                        };
+                        return typeMap[type] || type;
+                    };
+
+                    // Initialize the app
+                    $scope.init();
+                    
+                    // Hide the loading overlay once Angular is ready
+                    document.getElementById('angular-loading').style.display = 'none';
+                }]);
+                
+                // Bootstrap the app manually
+                angular.bootstrap(document, ['notificationApp']);
+            } else {
+                // Angular not loaded yet, check again in 100ms
+                setTimeout(checkAngular, 100);
+            }
+        }
+        
+        // Start checking for Angular
+        checkAngular();
+    });
+</script>
+
+{% endblock %}

@@ -46,15 +46,16 @@ class EmailCommunication(models.Model):
 class AdminNotification(models.Model):
     """System notifications for admin dashboard"""
     NOTIFICATION_TYPE_CHOICES = [
-        ('SYNOPSIS_APPROVAL', 'Synopsis Needs Approval'),
-        ('EVALUATOR_ASSIGNMENT', 'Evaluator Assignment Required'),
-        ('EVALUATOR_CONFIRMED', 'Evaluator Confirmed'),
-        ('PROJECT_SUBMITTED', 'Project Submitted for Evaluation'),
-        ('EVALUATION_COMPLETED', 'Evaluation Completed'),
-        ('VIVA_READY', 'Project Ready for Viva'),
-        ('PAYMENT_REQUIRED', 'Payment to Evaluator Required'),
-        ('PROJECT_COMPLETED', 'Project Completed'),
-        ('EMAIL_FAILED', 'Email Communication Failed'),
+        ('RECEIVED_EMAIL', 'Received Email'), # needed for initial
+        ('SYNOPSIS_APPROVAL', 'Synopsis Needs Approval'), # not needed
+        ('EVALUATOR_ASSIGNMENT', 'Evaluator Assignment Required'), # not needed
+        ('EVALUATOR_CONFIRMED', 'Evaluator Confirmed'), # needed that shows this evaluator has ssigned
+        ('PROJECT_SUBMITTED', 'Project Submitted for Evaluation'), # not needed
+        ('EVALUATION_COMPLETED', 'Evaluation Completed'), # nedded for showing that he evaluated without errors
+        ('VIVA_READY', 'Project Ready for Viva'), # not needed
+        ('PAYMENT_REQUIRED', 'Payment to Evaluator Required'), # needed to handle payment queries
+        ('PROJECT_COMPLETED', 'Project Completed'), # not needed
+        ('EMAIL_FAILED', 'Email Communication Failed'), # not needed
     ]
     
     PRIORITY_CHOICES = [
@@ -64,7 +65,8 @@ class AdminNotification(models.Model):
         ('URGENT', 'Urgent'),
     ]
     
-    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='notifications')
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='notifications', null=True, blank=True)
+    from_email = models.EmailField()
     notification_type = models.CharField(max_length=30, choices=NOTIFICATION_TYPE_CHOICES)
     title = models.CharField(max_length=200)
     message = models.TextField()
@@ -72,12 +74,13 @@ class AdminNotification(models.Model):
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     read_at = models.DateTimeField(null=True, blank=True)
-    
+    attachments = models.JSONField(default=list, help_text="List of attachment file names")
+    google_message_id = models.CharField(max_length=200, blank=True, help_text="Message Subject id we use to track the email")
     class Meta:
         ordering = ['-created_at']
     
     def __str__(self):
-        return f"{self.notification_type} - {self.project.student.student_id}"
+        return f"{self.notification_type}"
 
 
 

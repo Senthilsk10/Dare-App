@@ -122,3 +122,9 @@ DEFAULT_FROM_EMAIL = 'noreply@dare-phd.edu'
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+REST_FRAMEWORK = {
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.AllowAny',  # <- Make sure this is here
+    ],
+}
