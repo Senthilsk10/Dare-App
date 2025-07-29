@@ -105,15 +105,15 @@ def admin_notification_detail(request, pk):
             assign_evaluator = data.get('assign_evaluator')
             
             # Print initial values
-            print("\n=== BEFORE ASSIGNMENT ===")
-            print("Project initial values:", ProjectFullSerializer(project).data)
-            print("Evaluator pool initial values:", [
-                {
-                    'evaluator': pool.evaluator.email,
-                    'evaluator_type': pool.evaluator.evaluator_type,
-                    'retry_count': pool.retry_count
-                } for pool in project.evaluator_pool.all()
-            ])
+            # print("\n=== BEFORE ASSIGNMENT ===")
+            # print("Project initial values:", ProjectFullSerializer(project).data)
+            # print("Evaluator pool initial values:", [
+            #     {
+            #         'evaluator': pool.evaluator.email,
+            #         'evaluator_type': pool.evaluator.evaluator_type,
+            #         'retry_count': pool.retry_count
+            #     } for pool in project.evaluator_pool.all()
+            # ])
             
             if 'is_read' in data and data['is_read']:
                 notification.is_read = True
@@ -137,16 +137,16 @@ def admin_notification_detail(request, pk):
                             # Save project changes
                             project.save()
                             
-                            # Print final values
-                            print("\n=== AFTER ASSIGNMENT ===")
-                            print("Project final values:", ProjectFullSerializer(project).data)
-                            print("Evaluator pool final values:", [
-                                {
-                                    'evaluator': pool.evaluator.email,
-                                    'evaluator_type': pool.evaluator.evaluator_type,
-                                    'retry_count': pool.retry_count
-                                } for pool in project.evaluator_pool.all()
-                            ])
+                            # # Print final values
+                            # print("\n=== AFTER ASSIGNMENT ===")
+                            # print("Project final values:", ProjectFullSerializer(project).data)
+                            # print("Evaluator pool final values:", [
+                            #     {
+                            #         'evaluator': pool.evaluator.email,
+                            #         'evaluator_type': pool.evaluator.evaluator_type,
+                            #         'retry_count': pool.retry_count
+                            #     } for pool in project.evaluator_pool.all()
+                            # ])
                             
                             # Remove test exception
                             # raise Exception("test")
@@ -163,7 +163,7 @@ def admin_notification_detail(request, pk):
                 # evaluator enquired about payment like confirming or some thing like that.. i think we need to get the attachment for claim bill ...
                 
                 # others ..
-                # notification.save()
+                notification.save()
                 return JsonResponse({'status': 'success', 'message': 'Notification marked as read'})
             return JsonResponse({'status': 'no changes'})
         except json.JSONDecodeError:
