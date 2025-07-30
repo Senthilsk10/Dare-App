@@ -96,9 +96,42 @@ document.addEventListener('DOMContentLoaded', function () {
     }]);
 
     /* ------------------------------------------------------------------
-     * CENTRAL DATA SERVICE (stubbed for now)
-     * Replace with real $http calls to your Django API endpoints later.
+     * CENTRAL DATA SERVICE
      * ------------------------------------------------------------------*/
+    // Global toast notification function
+    function showToast(message, type = 'info') {
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type} animate-slide-in w-72 rounded-lg border-l-4 p-4 shadow bg-white`;
+        
+        // Customize border color and icon based on type
+        const icons = {
+            info: '📣',
+            success: '✅',
+            error: '❌',
+            warning: '⚠️',
+        };
+        const borderColors = {
+            info: 'border-blue-500',
+            success: 'border-green-500',
+            error: 'border-red-500',
+            warning: 'border-yellow-500',
+        };
+    
+        toast.classList.add(borderColors[type] || borderColors.info);
+    
+        toast.innerHTML = `<div class="text-sm font-medium text-gray-800">${icons[type] || 'ℹ️'} ${message}</div>`;
+    
+        const container = document.getElementById('toast-container');
+        container.appendChild(toast);
+    
+        // Auto-remove after 4s
+        setTimeout(() => {
+            toast.classList.add('opacity-0', 'translate-x-4');
+            setTimeout(() => toast.remove(), 300);
+        }, 4000);
+    }
+    
+
     app.factory('DataService', ['$http', function($http) {
         const base = '/api/'; // will automatically use https if site is served over https
         const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value || 
@@ -118,17 +151,34 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         }
         function save(type, item) {
-            if (type === 'students') {
+            const method = item.id ? 'put' : 'post';
+            const url = item.id ? `${base}${type}/${item.id}/` : `${base}${type}/`;
+            if (type=='students'){
                 item.enrollment_date = new Date(item.enrollment_date).toISOString().slice(0, 10);
             }
-            if (item.id) {
-                console.log(`saving type with id:${item.id}`);
-                return $http.put(base + type + '/' + item.id + '/', item).then(r => r.data);
-            }
-            return $http.post(base + type + '/', item).then(r => r.data);
+            return $http[method](url, item)
+                .then(r => {
+                    showToast(`${type.slice(0, -1)} ${item.id ? 'updated' : 'created'} successfully`, 'success');
+                    return r.data;
+                })
+                .catch(error => {
+                    if (error.status === 400 && error.data) {
+                        showToast('Please fix the form errors', 'error');
+                        return Promise.reject(error);
+                    }
+                    showToast(`Failed to save ${type.slice(0, -1)}: ${error.statusText || 'Unknown error'}`, 'error');
+                    return Promise.reject(error);
+                });
         }
         function remove(type, item) {
-            return $http.delete(base + type + '/' + item.id + '/');
+            return $http.delete(base + type + '/' + item.id + '/')
+                .then(() => {
+                    showToast(`${type.slice(0, -1)} deleted successfully`, 'success');
+                })
+                .catch(error => {
+                    showToast(`Failed to delete ${type.slice(0, -1)}: ${error.statusText || 'Unknown error'}`, 'error');
+                    throw error;
+                });
         }
         return { list, save, remove };
     }]);
@@ -153,6 +203,7 @@ document.addEventListener('DOMContentLoaded', function () {
         $scope.departments = [];
         $scope.selectedDept = null;
         $scope.showPanel = false;
+        $scope.formErrors = {};
         $scope.facultyChoices = [
             {value: 'FACULTY_OF_AGRICULTURE', label: 'Faculty of Agriculture'},
             {value: 'FACULTY_OF_ARTS', label: 'Faculty of Arts'},
@@ -193,12 +244,44 @@ document.addEventListener('DOMContentLoaded', function () {
             $scope.selectedDept = null;
             $scope.showPanel = false;
         };
+        $scope.validateDepartment = function(dept) {
+            $scope.formErrors = {};
+            let isValid = true;
+            if (!dept.name || dept.name.trim().length < 2) {
+                $scope.formErrors.name = 'Department name is required (min 2 characters)'; isValid = false;
+            }
+            if (!dept.code || !/^[A-Z0-9]+$/.test(dept.code)) {
+                $scope.formErrors.code = 'Code must contain only uppercase letters and numbers'; isValid = false;
+            }
+            if (!dept.faculty) {
+                $scope.formErrors.faculty = 'Please select a faculty'; isValid = false;
+            }
+            if (!dept.head_of_department || dept.head_of_department.trim().length < 2) {
+                $scope.formErrors.head_of_department = 'Head of Department is required (min 2 characters)'; isValid = false;
+            }
+            if (!dept.contact_email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dept.contact_email)) {
+                $scope.formErrors.contact_email = 'Valid email is required'; isValid = false;
+            }
+            if (dept.phone && !/^[0-9+\- ]*$/.test(dept.phone)) {
+                $scope.formErrors.phone = 'Invalid phone number format'; isValid = false;
+            }
+            return isValid;
+        };
         $scope.saveDept = function() {
+            if (!$scope.validateDepartment($scope.selectedDept)) {
+                showToast('Please fix the form errors', 'error');
+                return;
+            }
             DataService.save('departments', $scope.selectedDept).then(function() {
                 $scope.closePanel();
                 refresh();
+            }).catch(function(error) {
+                if (error.data) {
+                    $scope.formErrors = error.data;
+                }
             });
         };
+
         $scope.deleteDept = function() {
             if (window.confirm('Are you sure you want to delete this department? This action cannot be undone.')) {
                 DataService.remove('departments', $scope.selectedDept).then(function() {
@@ -210,6 +293,39 @@ document.addEventListener('DOMContentLoaded', function () {
     }]);
 
     app.controller('GuideCtrl', ['$scope', 'DataService', function($scope, DataService) {
+        $scope.formErrors = {};
+        $scope.validateGuide = function(guide) {
+            $scope.formErrors = {};
+            let isValid = true;
+            if (!guide.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guide.email)) {
+                $scope.formErrors.email = 'Valid email is required'; isValid = false;
+            }
+            if (!guide.employee_id || guide.employee_id.trim().length === 0) {
+                $scope.formErrors.employee_id = 'Employee ID is required'; isValid = false;
+            }
+            if (!guide.name || guide.name.trim().length < 2) {
+                $scope.formErrors.name = 'Name is required (min 2 characters)'; isValid = false;
+            }
+            if (!guide.department) {
+                $scope.formErrors.department = 'Department is required'; isValid = false;
+            }
+            if (guide.phone && !/^[0-9+\- ]+$/.test(guide.phone)) {
+                $scope.formErrors.phone = 'Invalid phone number format'; isValid = false;
+            }
+            if (guide.max_students < 0 || guide.max_students > 20) {
+                $scope.formErrors.max_students = 'Max students must be between 0 and 20'; isValid = false;
+            }
+            return isValid;
+        };
+        var _saveGuide = $scope.saveGuide;
+        $scope.saveGuide = function() {
+            if (!$scope.validateGuide($scope.selectedGuide)) {
+                showToast('Please fix the form errors', 'error');
+                return;
+            }
+            _saveGuide.apply(this, arguments);
+        };
+
         $scope.guides = [];
         $scope.selectedGuide = null;
         $scope.showPanel = false;
@@ -252,6 +368,42 @@ document.addEventListener('DOMContentLoaded', function () {
     }]);
 
     app.controller('StudentCtrl', ['$scope', 'DataService', function($scope, DataService) {
+        $scope.formErrors = {};
+        $scope.validateStudent = function(student) {
+            $scope.formErrors = {};
+            let isValid = true;
+            if (!student.student_id || student.student_id.trim().length === 0) {
+                $scope.formErrors.student_id = 'Student ID is required'; isValid = false;
+            }
+            if (!student.name || student.name.trim().length < 2) {
+                $scope.formErrors.name = 'Name is required (min 2 characters)'; isValid = false;
+            }
+            if (!student.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(student.email)) {
+                $scope.formErrors.email = 'Valid email is required'; isValid = false;
+            }
+            if (!student.course) {
+                $scope.formErrors.course = 'Course is required'; isValid = false;
+            }
+            if (!student.enrollment_date) {
+                $scope.formErrors.enrollment_date = 'Enrollment date is required'; isValid = false;
+            }
+            if (!student.current_semester || student.current_semester < 1 || student.current_semester > 12) {
+                $scope.formErrors.current_semester = 'Semester must be between 1 and 12'; isValid = false;
+            }
+            if (student.phone && !/^[0-9+\- ]+$/.test(student.phone)) {
+                $scope.formErrors.phone = 'Invalid phone number format'; isValid = false;
+            }
+            return isValid;
+        };
+        var _saveStudent = $scope.saveStudent;
+        $scope.saveStudent = function() {
+            if (!$scope.validateStudent($scope.selectedStudent)) {
+                showToast('Please fix the form errors', 'error');
+                return;
+            }
+            _saveStudent.apply(this, arguments);
+        };
+
         $scope.students = [];
         $scope.selectedStudent = null;
         $scope.showPanel = false;
@@ -300,6 +452,39 @@ document.addEventListener('DOMContentLoaded', function () {
     }]);
 
     app.controller('CourseCtrl', ['$scope', 'DataService', function($scope, DataService) {
+        $scope.formErrors = {};
+        $scope.validateCourse = function(course) {
+            $scope.formErrors = {};
+            let isValid = true;
+            if (!course.name || course.name.trim().length < 2) {
+                $scope.formErrors.name = 'Course name is required (min 2 characters)'; isValid = false;
+            }
+            if (!course.code || !/^[A-Z0-9]+$/.test(course.code)) {
+                $scope.formErrors.code = 'Valid course code is required (uppercase letters and numbers only)'; isValid = false;
+            }
+            if (!course.department) {
+                $scope.formErrors.department = 'Department is required'; isValid = false;
+            }
+            if (!course.total_semesters || course.total_semesters < 1 || course.total_semesters > 12) {
+                $scope.formErrors.total_semesters = 'Total semesters must be between 1 and 12'; isValid = false;
+            }
+            if (!course.min_project_semester || course.min_project_semester < 1 || course.min_project_semester > course.total_semesters) {
+                $scope.formErrors.min_project_semester = `Project semester must be between 1 and ${course.total_semesters}`; isValid = false;
+            }
+            if (!course.fee_per_semester || course.fee_per_semester < 0) {
+                $scope.formErrors.fee_per_semester = 'Fee must be a positive number'; isValid = false;
+            }
+            return isValid;
+        };
+        var _saveCourse = $scope.saveCourse;
+        $scope.saveCourse = function() {
+            if (!$scope.validateCourse($scope.selectedCourse)) {
+                showToast('Please fix the form errors', 'error');
+                return;
+            }
+            _saveCourse.apply(this, arguments);
+        };
+
         $scope.courses = [];
         $scope.selectedCourse = null;
         $scope.showPanel = false;

@@ -1,3 +1,7 @@
+<div id="toast-container" class="fixed top-4 left-2/12 z-50 space-y-2">
+  <!-- Toasts will be inserted here -->
+</div>
+
 <div class="flex h-full w-full relative" ng-controller="StudentCtrl">
   <!-- Full-screen List -->
   <div class="flex-1 p-6 overflow-y-auto" ng-class="{'pr-96': showPanel}">
@@ -31,18 +35,21 @@
         <h2 class="text-xl font-bold">{{selectedStudent && selectedStudent.id ? 'Edit' : 'Add'}} Student</h2>
         <button class="text-gray-500 hover:text-gray-800" ng-click="closePanel()">✕</button>
       </div>
-      <form ng-submit="saveStudent()" class="flex-1 flex flex-col gap-4 overflow-y-auto pb-24">
+      <form name="studentForm" ng-submit="saveStudent()" class="flex-1 flex flex-col gap-4 overflow-y-auto pb-24">
         <div>
-          <label class="block text-sm font-medium mb-1">Student ID</label>
-          <input type="text" ng-model="selectedStudent.student_id" class="w-full border rounded px-2 py-1" required>
+          <label class="block text-sm font-medium mb-1">Student ID <span class="text-red-500">*</span></label>
+          <input type="text" ng-model="selectedStudent.student_id" name="studentId" class="w-full border rounded px-2 py-1" ng-class="{'border-red-500': studentForm.studentId.$invalid && (studentForm.studentId.$dirty || studentForm.$submitted)}" required>
+          <p class="text-red-500 text-xs mt-1" ng-if="studentForm.studentId.$invalid && (studentForm.studentId.$dirty || studentForm.$submitted)">Please enter a valid student ID.</p>
         </div>
         <div>
-          <label class="block text-sm font-medium mb-1">Name</label>
-          <input type="text" ng-model="selectedStudent.name" class="w-full border rounded px-2 py-1" required>
+          <label class="block text-sm font-medium mb-1">Name <span class="text-red-500">*</span></label>
+          <input type="text" ng-model="selectedStudent.name" name="studentName" class="w-full border rounded px-2 py-1" ng-class="{'border-red-500': studentForm.studentName.$invalid && (studentForm.studentName.$dirty || studentForm.$submitted)}" required minlength="2">
+          <p class="text-red-500 text-xs mt-1" ng-if="studentForm.studentName.$invalid && (studentForm.studentName.$dirty || studentForm.$submitted)">Please enter a valid name.</p>
         </div>
         <div>
-          <label class="block text-sm font-medium mb-1">Email</label>
-          <input type="email" ng-model="selectedStudent.email" class="w-full border rounded px-2 py-1" required>
+          <label class="block text-sm font-medium mb-1">Email <span class="text-red-500">*</span></label>
+          <input type="email" ng-model="selectedStudent.email" name="studentEmail" class="w-full border rounded px-2 py-1" ng-class="{'border-red-500': studentForm.studentEmail.$invalid && (studentForm.studentEmail.$dirty || studentForm.$submitted)}" required pattern="[^@\s]+@[^@\s]+\.[^@\s]+" ng-pattern="/^[^\s@]+@[^\s@]+\.[^\s@]+$/">
+          <p class="text-red-500 text-xs mt-1" ng-if="studentForm.studentEmail.$invalid && (studentForm.studentEmail.$dirty || studentForm.$submitted)">Please enter a valid email address.</p>
         </div>
         <div>
           <label class="block text-sm font-medium mb-1">Course</label>
@@ -53,12 +60,14 @@
           <select ng-model="selectedStudent.guide" ng-options="g.id as g.email for g in guidesList" class="w-full border rounded px-2 py-1"></select>
         </div>
         <div>
-          <label class="block text-sm font-medium mb-1">Enrollment Date</label>
-          <input type="date" ng-model="selectedStudent.enrollment_date" class="w-full border rounded px-2 py-1" required>
+          <label class="block text-sm font-medium mb-1">Enrollment Date <span class="text-red-500">*</span></label>
+          <input type="date" ng-model="selectedStudent.enrollment_date" name="studentEnrollDate" class="w-full border rounded px-2 py-1" ng-class="{'border-red-500': studentForm.studentEnrollDate.$invalid && (studentForm.studentEnrollDate.$dirty || studentForm.$submitted)}" required>
+          <p class="text-red-500 text-xs mt-1" ng-if="studentForm.studentEnrollDate.$invalid && (studentForm.studentEnrollDate.$dirty || studentForm.$submitted)">Please enter a valid enrollment date.</p>
         </div>
         <div>
-          <label class="block text-sm font-medium mb-1">Current Semester</label>
-          <input type="number" ng-model="selectedStudent.current_semester" class="w-full border rounded px-2 py-1" min="1" max="12" required>
+          <label class="block text-sm font-medium mb-1">Current Semester <span class="text-red-500">*</span></label>
+          <input type="number" ng-model="selectedStudent.current_semester" name="studentSemester" class="w-full border rounded px-2 py-1" ng-class="{'border-red-500': studentForm.studentSemester.$invalid && (studentForm.studentSemester.$dirty || studentForm.$submitted)}" min="1" max="12" required>
+          <p class="text-red-500 text-xs mt-1" ng-if="studentForm.studentSemester.$invalid && (studentForm.studentSemester.$dirty || studentForm.$submitted)">Please enter a valid semester.</p>
         </div>
         <div>
           <label class="block text-sm font-medium mb-1">Status</label>
@@ -66,7 +75,8 @@
         </div>
         <div>
           <label class="block text-sm font-medium mb-1">Phone</label>
-          <input type="text" ng-model="selectedStudent.phone" class="w-full border rounded px-2 py-1">
+          <input type="text" ng-model="selectedStudent.phone" name="studentPhone" class="w-full border rounded px-2 py-1" ng-class="{'border-red-500': studentForm.studentPhone.$invalid && (studentForm.studentPhone.$dirty || studentForm.$submitted)}" ng-pattern="/^[0-9+\- ]*$/">
+          <p class="text-red-500 text-xs mt-1" ng-if="studentForm.studentPhone.$invalid && (studentForm.studentPhone.$dirty || studentForm.$submitted)">Please enter a valid phone number.</p>
         </div>
         <div>
           <label class="block text-sm font-medium mb-1">Address</label>

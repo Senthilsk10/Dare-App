@@ -12,8 +12,25 @@
 <div ng-view class="h-full"></div>
 {% endblock %}
 
+<!-- Toast Container -->
+<div id="toast-container" class="fixed bottom-4 right-4 z-50 space-y-2">
+    <!-- Toasts will be inserted here -->
+</div>
+
 {% block extra_js %}
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
     <script src="{% static 'js/datatables-setup.js' %}"></script>
+    
+    <style>
+        .toast {
+            @apply px-4 py-3 rounded shadow-lg text-white max-w-xs transition-all duration-300 transform translate-x-0 opacity-100;
+        }
+        .toast-success { @apply bg-green-500; }
+        .toast-error { @apply bg-red-500; }
+        .toast-info { @apply bg-blue-500; }
+        .toast-warning { @apply bg-yellow-500; }
+        .toast-enter { @apply translate-x-full opacity-0; }
+        .toast-leave { @apply opacity-0 scale-90; }
+    </style>
 {% endblock %}
