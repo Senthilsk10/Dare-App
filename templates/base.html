@@ -69,6 +69,7 @@
                 {% block content %}
                 <!-- Content will be injected here by child templates -->
                 {% endblock %}
+                {% block spa_content %}{% endblock %}
             </main>
             
             <!-- Footer -->
@@ -80,6 +81,8 @@
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.12.0/dist/cdn.min.js"></script>
     <!-- AngularJS -->
     <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular.min.js"></script>
+    <!-- AngularJS ngRoute for SPA routing -->
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular-route.min.js"></script>
     <!-- JavaScript Libraries -->
     <script src="{% static 'js/app.js' %}"></script>
     <!-- jQuery (required for DataTables) -->

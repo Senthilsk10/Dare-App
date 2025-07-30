@@ -91,9 +91,23 @@ class User(AbstractUser):
         return ""
 
 class Department(models.Model):
+    FACULTY_CHOICES = [
+        ("FACULTY_OF_AGRICULTURE", "Faculty of Agriculture"),
+        ("FACULTY_OF_ARTS", "Faculty of Arts"),
+        ("FACULTY_OF_DENTISTRY", "Faculty of Dentistry"),
+        ("FACULTY_OF_EDUCATION", "Faculty of Education"),
+        ("FACULTY_OF_ENGINEERING_TECHNOLOGY", "Faculty of Engineering & Technology"),
+        ("FACULTY_OF_FINE_ARTS", "Faculty of Fine Arts"),
+        ("FACULTY_OF_INDIAN_LANGUAGES", "Faculty of Indian Languages"),
+        ("FACULTY_OF_MARINE_SCIENCES", "Faculty of Marine Sciences"),
+        ("FACULTY_OF_MEDICINE", "Faculty of Medicine"),
+        ("FACULTY_OF_SCIENCE", "Faculty of Science"),
+    ]
+
     """Academic departments offering PhD programs"""
     name = models.CharField(max_length=200)
     code = models.CharField(max_length=10, unique=True)
+    faculty = models.CharField(max_length=200,choices=FACULTY_CHOICES,default='FACULTY_OF_ENGINEERING_TECHNOLOGY')
     head_of_department = models.CharField(max_length=200)
     contact_email = models.EmailField()
     phone = models.CharField(max_length=20, blank=True)
@@ -120,6 +134,7 @@ class Course(models.Model):
 class Guide(models.Model):
     """Faculty members who can guide PhD students"""
     is_hod = models.BooleanField(default=False)
+    name = models.CharField(max_length=200)
     email = models.EmailField(unique=True)
     employee_id = models.CharField(max_length=50, unique=True)
     department = models.ForeignKey(Department, on_delete=models.CASCADE)
@@ -158,6 +173,7 @@ class PhDStudent(models.Model):
     ]
     
     student_id = models.CharField(max_length=50, unique=True)
+    name = models.CharField(max_length=200)
     email = models.EmailField(unique=True)
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
     guide = models.ForeignKey(Guide, on_delete=models.SET_NULL, null=True, blank=True)

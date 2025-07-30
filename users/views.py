@@ -11,7 +11,13 @@ from django.views.decorators.http import require_http_methods
 from django.template.loader import render_to_string
 from django.db.models import Q
 
-from .models import User, Guide, PhDStudent
+# API ViewSets for SPA
+from rest_framework import viewsets
+from rest_framework.permissions import IsAuthenticated
+from .models import Course
+from .serializers import CourseSerializer, GuideSerializer, PhDStudentSerializer, DepartmentSerializer
+
+from .models import User, Course, Guide, PhDStudent,Department
 
 # Manage Users (Admin) with DataTables filtering by user type
 from django.contrib.auth.decorators import user_passes_test
@@ -24,6 +30,13 @@ def admin_required(view_func):
 def manage_users(request):
     users = User.objects.all()
     return render(request, 'admin_manage_users.html', {'users': users})
+
+# SPA entrypoint for AngularJS onboarding
+from django.contrib.auth.decorators import login_required
+
+@login_required
+def onboarding_spa(request):
+    return render(request, 'spa_base.html')
 
 # Dummy views for sidebar URLs
 @login_required
@@ -123,3 +136,53 @@ def switch_theme(request):
     else:
         request.session['dark_mode'] = True
     return redirect(request.META.get('HTTP_REFERER', 'users:dashboard'))
+
+# DRF ViewSets for SPA
+class CourseViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = CourseSerializer
+    def get_queryset(self):
+        qs = Course.objects.all()
+        user = self.request.user
+        if user.is_hod:
+            guide = Guide.objects.filter(email=user.email).first()
+            dept = guide.department if guide else None
+            return qs.filter(department=dept)
+        return qs
+
+class GuideViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = GuideSerializer
+    def get_queryset(self):
+        qs = Guide.objects.all()
+        user = self.request.user
+        if user.is_hod:
+            guide = Guide.objects.filter(email=user.email).first()
+            return qs.filter(department=guide.department) if guide else qs.none()
+        return qs
+
+class PhDStudentViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = PhDStudentSerializer
+    def get_queryset(self):
+        qs = PhDStudent.objects.all()
+        user = self.request.user
+        if user.is_hod:
+            guide = Guide.objects.filter(email=user.email).first()
+            dept = guide.department if guide else None
+            return qs.filter(course__department=dept)
+        elif user.is_guide:
+            return qs.filter(guide__email=user.email)
+        return qs
+    
+
+class DepartmentViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = DepartmentSerializer
+    def get_queryset(self):
+        qs = Department.objects.all()
+        user = self.request.user
+        if user.is_hod:
+            guide = Guide.objects.filter(email=user.email).first()
+            return qs.filter(id=guide.department.id) if guide else qs.none()
+        return qs

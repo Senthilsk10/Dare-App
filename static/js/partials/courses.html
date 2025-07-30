@@ -1,0 +1,91 @@
+<div class="flex h-full w-full relative" ng-controller="CourseCtrl">
+  <!-- Full-screen List -->
+  <div class="flex-1 p-6 overflow-y-auto" ng-class="{'pr-96': showPanel}">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-2xl font-semibold">Courses</h2>
+      <button class="px-4 py-2 bg-green-600 text-white rounded shadow" ng-click="openPanelForNew()">Add Course</button>
+    </div>
+    <table id="coursesTable" class="min-w-full bg-white rounded shadow">
+      <thead>
+        <tr class="bg-gray-100 text-left">
+          <th class="py-2 px-4">Name</th>
+          <th class="py-2 px-4">Code</th>
+          <th class="py-2 px-4">Department</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr ng-repeat="c in courses" ng-click="openPanelForEdit(c)" class="hover:bg-blue-50 cursor-pointer" ng-class="{'bg-blue-100': selectedCourse && selectedCourse.id === c.id}">
+          <td class="py-2 px-4 font-medium">{{c.name}}</td>
+          <td class="py-2 px-4">{{c.code}}</td>
+          <td class="py-2 px-4">{{getDepartmentName(c.department)}}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <!-- Slide-in Panel -->
+  <div class="fixed top-0 right-0 h-full w-[540px] max-w-full md:w-[540px] md:max-w-[540px] w-[70vw] bg-white shadow-xl border-l z-30 transition-transform duration-300" ng-class="{'translate-x-0': showPanel, 'translate-x-full': !showPanel}" style="will-change: transform;">
+    <div class="p-6 flex flex-col h-full">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold">{{selectedCourse && selectedCourse.id ? 'Edit' : 'Add'}} Course</h2>
+        <button class="text-gray-500 hover:text-gray-800" ng-click="closePanel()">✕</button>
+      </div>
+      <form ng-submit="saveCourse()" class="flex-1 flex flex-col gap-4 overflow-y-auto pb-24">
+        <div>
+          <label class="block text-sm font-medium mb-1">Name</label>
+          <input type="text" ng-model="selectedCourse.name" class="w-full border rounded px-2 py-1" required>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Code</label>
+          <input type="text" ng-model="selectedCourse.code" class="w-full border rounded px-2 py-1" required>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Department</label>
+          <select ng-model="selectedCourse.department" ng-options="d.id as d.name for d in departmentsList" class="w-full border rounded px-2 py-1" required></select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Total Semesters</label>
+          <input type="number" ng-model="selectedCourse.total_semesters" class="w-full border rounded px-2 py-1" min="1" required>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Min Project Semester</label>
+          <input type="number" ng-model="selectedCourse.min_project_semester" class="w-full border rounded px-2 py-1" min="1" required>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Fee Per Semester</label>
+          <input type="number" ng-model="selectedCourse.fee_per_semester" class="w-full border rounded px-2 py-1" min="0" step="0.01" required>
+        </div>
+      </form>
+      <div class="mt-2">
+        <div ng-if="selectedCourse.created_at" class="text-lg text-gray-500">
+          <span class="font-semibold">Created:</span>
+          {{selectedCourse.created_at | date:'MMM d yyyy'}}
+        </div>
+        <div ng-if="selectedCourse.updated_at" class="text-lg text-gray-500">
+          <span class="font-semibold">Updated:</span>
+          {{selectedCourse.updated_at | date:'MMM d yyyy'}}
+        </div>
+      </div>
+      <div class="sticky bottom-0 right-0 flex justify-end bg-white/95 backdrop-blur-sm pt-4 pb-6 px-6 z-10 border-t shadow-md">
+        <div class="flex space-x-3">
+          <button
+            type="submit"
+            ng-click="saveCourse()"
+            class="px-6 py-2 bg-blue-600 text-white rounded-md shadow hover:bg-blue-700 transition-colors duration-200"
+          >
+            Save
+          </button>
+      
+          <button
+            type="button"
+            ng-click="deleteCourse()"
+            ng-if="selectedCourse.id"
+            class="px-6 py-2 bg-red-600 text-white rounded-md shadow hover:bg-red-700 transition-colors duration-200"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+      
+    </div>
+  </div>
+</div>

@@ -1,0 +1,97 @@
+<div class="flex h-full w-full relative" ng-controller="DepartmentCtrl">
+  <!-- Full-screen List -->
+  <div class="flex-1 p-6 overflow-y-auto" ng-class="{'pr-96': showPanel}">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-2xl font-semibold">Departments</h2>
+      <button class="px-4 py-2 bg-green-600 text-white rounded shadow" ng-click="openPanelForNew()">Add Department</button>
+    </div>
+    <table id="departmentsTable" class="min-w-full bg-white rounded shadow">
+      <thead>
+        <tr class="bg-gray-100 text-left">
+          <th class="py-2 px-4">Name</th>
+          <th class="py-2 px-4">Code</th>
+          <th class="py-2 px-4">Head of Department</th>
+          <th class="py-2 px-4">Contact Email</th>
+          <th class="py-2 px-4">Phone</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr ng-repeat="dept in departments" ng-click="openPanelForEdit(dept)" class="hover:bg-blue-50 cursor-pointer" ng-class="{'bg-blue-100': selectedDept && selectedDept.id === dept.id}">
+          <td class="py-2 px-4 font-medium">{{dept.name}}</td>
+          <td class="py-2 px-4">{{dept.code}}</td>
+          <td class="py-2 px-4">{{dept.head_of_department}}</td>
+          <td class="py-2 px-4">{{dept.contact_email}}</td>
+          <td class="py-2 px-4">{{dept.phone}}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <!-- Slide-in Panel -->
+  <div class="fixed top-0 right-0 h-full w-[540px] max-w-full md:w-[540px] md:max-w-[540px] w-[70vw] bg-white shadow-xl border-l z-30 transition-transform duration-300" ng-class="{'translate-x-0': showPanel, 'translate-x-full': !showPanel}" style="will-change: transform;">
+    <div class="p-6 flex flex-col h-full">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold">{{selectedDept && selectedDept.id ? 'Edit' : 'Add'}} Department</h2>
+        <button class="text-gray-500 hover:text-gray-800" ng-click="closePanel()">✕</button>
+      </div>
+      <form ng-submit="saveDept()" class="flex-1 flex flex-col gap-4 overflow-y-auto pb-24">
+        <div>
+          <label class="block text-sm font-medium mb-1">Name</label>
+          <input type="text" ng-model="selectedDept.name" class="w-full border rounded px-2 py-1" required>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Code</label>
+          <input type="text" ng-model="selectedDept.code" class="w-full border rounded px-2 py-1" required>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Faculty</label>
+          <select ng-model="selectedDept.faculty" class="w-full border rounded px-2 py-1" required>
+            <option ng-repeat="faculty in facultyChoices" value="{{faculty.value}}">{{faculty.label}}</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Head of Department</label>
+          <input type="text" ng-model="selectedDept.head_of_department" class="w-full border rounded px-2 py-1" required>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Contact Email</label>
+          <input type="email" ng-model="selectedDept.contact_email" class="w-full border rounded px-2 py-1" required>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Phone</label>
+          <input type="text" ng-model="selectedDept.phone" class="w-full border rounded px-2 py-1">
+        </div>
+      </form>
+      <div class="mt-2">
+        <div ng-if="selectedDept.created_at" class="text-lg text-gray-500">
+          <span class="font-semibold">Created:</span>
+          {{selectedDept.created_at | date:'MMM d yyyy'}}
+        </div>
+        <div ng-if="selectedDept.updated_at" class="text-lg text-gray-500">
+          <span class="font-semibold">Updated:</span>
+          {{selectedDept.updated_at | date:'MMM d yyyy'}}
+        </div>
+      </div>
+      <div class="sticky bottom-0 right-0 flex justify-end bg-white/95 backdrop-blur-sm pt-4 pb-6 px-6 z-10 border-t shadow-md">
+        <div class="flex space-x-3">
+          <button
+            type="submit"
+            ng-click="saveDept()"
+            class="px-6 py-2 bg-blue-600 text-white rounded-md shadow hover:bg-blue-700 transition-colors duration-200"
+          >
+            Save
+          </button>
+      
+          <button
+            type="button"
+            ng-click="deleteDept()"
+            ng-if="selectedDept.id"
+            class="px-6 py-2 bg-red-600 text-white rounded-md shadow hover:bg-red-700 transition-colors duration-200"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+      
+    </div>
+  </div>
+</div>

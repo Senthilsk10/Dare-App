@@ -21,6 +21,9 @@ urlpatterns = [
     path('reset/done/', auth_views.PasswordResetCompleteView.as_view(template_name='registration/password_reset_complete.html'), 
          name='password_reset_complete'),
     
+    # SPA onboarding entrypoint
+    path('onboarding/', views.onboarding_spa, name='onboarding_spa'),
+
     # Dashboard
     path('', views.DashboardView.as_view(), name='dashboard'),
     
