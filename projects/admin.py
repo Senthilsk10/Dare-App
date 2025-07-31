@@ -7,8 +7,8 @@ admin.site.register(WebhookLog)
 
 
 class ProjectEvaluatorPoolInline(admin.TabularInline):
-    model = ProjectEvaluatorPool
-    fields = ['evaluator', 'priority_order']
+    model = VersionedProjectEvaluatorPool
+    fields = ['evaluator', 'priority_order','version']
     extra = 1  # How many blank rows to show
     autocomplete_fields = ['evaluator']  # enables search + "add in place"
     

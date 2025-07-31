@@ -20,4 +20,8 @@ urlpatterns = [
     path('api/admin-notifications/counts/', notify_views.notification_counts, name='api_notification_counts'),
     path('api/projects/', notify_views.ProjectListView.as_view(), name='api_projects'),
     path('api/evaluators/', notify_views.EvaluatorListView.as_view(), name='api_evaluators'),
+    path('api/email-summary/', views.MonthlyEmailCountAPI.as_view()),
+    path('api/email-list/', views.MonthlyEmailListAPI.as_view()),
+    path('api/email-details/', views.DailyEmailDetailsAPI.as_view()),
 ]
+

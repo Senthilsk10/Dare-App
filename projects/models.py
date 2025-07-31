@@ -1,7 +1,6 @@
 from django.db import models
 from users.models import *
 import uuid
-# Create your models here.
 
 class Project(models.Model):
     """PhD projects and their lifecycle"""
@@ -148,15 +147,16 @@ class ProjectStatusHistory(models.Model):
         return f"{self.project.student.student_id}: {self.previous_status} -> {self.new_status}"
 
 
-
-
+# =============================
+# deprecated
+# =============================
 class ProjectEvaluatorPool(models.Model):
     """Pool of 10 evaluators assigned to each project (5 foreign + 5 indian)"""
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='evaluator_pool')
     evaluator = models.ForeignKey(Evaluator, on_delete=models.CASCADE)
     assigned_date = models.DateTimeField(auto_now_add=True)
     priority_order = models.IntegerField(help_text="1-5 for each type (foreign/indian) & Higher score = higher priority")
-    retry_count = models.IntegerField(default=0)
+    retry_count = models.IntegerField(default=0,help_text="Retry count for approach")
     report_retry_count = models.IntegerField(default=0, help_text="Retry count for project submission emails")
     last_email_date = models.DateTimeField(null=True, blank=True)
     report_last_email_date = models.DateTimeField(null=True, blank=True)
@@ -196,6 +196,38 @@ class ProjectEvaluatorPool(models.Model):
     .name} (Priority: {self.priority_order})"
 
 
+class VersionedProjectEvaluatorPool(models.Model):
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="versioned_evaluator_pool")
+    evaluator = models.ForeignKey(Evaluator, on_delete=models.CASCADE)
+    version = models.PositiveIntegerField(help_text="Incremental version for evaluator set per project")
+    priority_order = models.IntegerField()
+    approach_mail_count = models.IntegerField(default=0)
+    report_mail_count = models.IntegerField(default=0)
+    last_approach_email_date = models.DateTimeField(null=True, blank=True)
+    last_evaluation_email_date = models.DateTimeField(null=True, blank=True)
+    next_approach_email_date = models.DateTimeField(null=True, blank=True)
+    next_evaluation_email_date = models.DateTimeField(null=True, blank=True)
+    
+    assigned_date = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ['project', 'evaluator', 'version']
+        ordering = ['evaluator__evaluator_type', 'priority_order']
+    
+    def __str__(self):
+        return f"{self.project_id} - {self.evaluator.name} (V{self.version})"
+    
+    @property
+    def approach_email_content(self):
+        from communications.utils import send_evaluator_approach_email
+        return send_evaluator_approach_email(self.project,self)
+    
+    @property
+    def project_email_content(self):
+        from communications.utils import send_thesis_submission_email
+        return send_thesis_submission_email(self.project,self)
+
+
 class WebhookLog(models.Model):
     """Log webhook requests from Google Forms"""
     project = models.ForeignKey(Project, on_delete=models.CASCADE)
@@ -221,3 +253,4 @@ class WebhookLog(models.Model):
     def __str__(self):
         return f"{self.project.student.student_id} - {self.file_type}"
     
+
