@@ -95,9 +95,6 @@ document.addEventListener('DOMContentLoaded', function () {
             .otherwise({ redirectTo: '/departments' });
     }]);
 
-    /* ------------------------------------------------------------------
-     * CENTRAL DATA SERVICE
-     * ------------------------------------------------------------------*/
     // Global toast notification function
     function showToast(message, type = 'info') {
         const toast = document.createElement('div');
@@ -116,14 +113,14 @@ document.addEventListener('DOMContentLoaded', function () {
             error: 'border-red-500',
             warning: 'border-yellow-500',
         };
-    
+        
         toast.classList.add(borderColors[type] || borderColors.info);
-    
+        
         toast.innerHTML = `<div class="text-sm font-medium text-gray-800">${icons[type] || 'ℹ️'} ${message}</div>`;
-    
+        
         const container = document.getElementById('toast-container');
         container.appendChild(toast);
-    
+        
         // Auto-remove after 4s
         setTimeout(() => {
             toast.classList.add('opacity-0', 'translate-x-4');
@@ -131,14 +128,29 @@ document.addEventListener('DOMContentLoaded', function () {
         }, 4000);
     }
     
-
-    app.factory('DataService', ['$http', function($http) {
+    
+    /* ------------------------------------------------------------------
+     * CENTRAL DATA SERVICE
+     * ------------------------------------------------------------------*/
+    app.factory('DataService', ['$http', '$location', '$rootScope', function($http, $location, $rootScope) {
         const base = '/api/'; // will automatically use https if site is served over https
         const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value || 
                        document.querySelector('meta[name=csrf-token]').getAttribute('content');
         $http.defaults.headers.common['X-CSRFToken'] = csrfToken;
+        
+        function getCurrentParams() {
+            return $location.search();
+        }
+
         function list(type) {
-            return $http.get(base + type + '/').then(r => {
+            const params = getCurrentParams();
+            let url = base + type + '/';
+            const query = Object.keys(params)
+                .filter(k => params[k] !== undefined && params[k] !== null && params[k] !== '')
+                .map(k => encodeURIComponent(k) + '=' + encodeURIComponent(params[k])).join('&');
+            
+            if (query) url += '?' + query;
+            return $http.get(url).then(r => {
                 // Patch for students: convert date strings to Date objects
                 if (type === 'students') {
                     r.data.forEach(s => {
@@ -150,9 +162,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 return r.data;
             });
         }
+        // Accepts optional params for filtering (e.g., department)
         function save(type, item) {
             const method = item.id ? 'put' : 'post';
-            const url = item.id ? `${base}${type}/${item.id}/` : `${base}${type}/`;
+            let url = item.id ? `${base}${type}/${item.id}/` : `${base}${type}/`;
+            const params = getCurrentParams();
+            const query = Object.keys(params)
+                .filter(k => params[k] !== undefined && params[k] !== null && params[k] !== '')
+                .map(k => encodeURIComponent(k) + '=' + encodeURIComponent(params[k])).join('&');
+            if (query) url += '?' + query;
             if (type=='students'){
                 item.enrollment_date = new Date(item.enrollment_date).toISOString().slice(0, 10);
             }
@@ -187,19 +205,24 @@ document.addEventListener('DOMContentLoaded', function () {
     /* ------------------------------------------------------------------
      * CONTROLLERS
      * ------------------------------------------------------------------*/
-    app.controller('AppController', ['$scope', function($scope) {
+    app.controller('AppController', ['$scope', '$location', '$route', function($scope, $location, $route) {
         $scope.appName = 'DARE PhD Management System';
+    
         $scope.toggleSidebar = function() {
             if (window.Alpine) {
                 window.Alpine.store('sidebar').toggle();
             }
         };
+    
         $scope.isAlpineAvailable = function() {
             return typeof window.Alpine !== 'undefined';
         };
+    
     }]);
+    
 
-    app.controller('DepartmentCtrl', ['$scope', 'DataService', function($scope, DataService) {
+    app.controller('DepartmentCtrl', ['$scope', 'DataService', '$location', '$route', '$timeout', function($scope, DataService, $location, $route, $timeout) {
+        $scope.user = window.CURRENT_USER;
         $scope.departments = [];
         $scope.selectedDept = null;
         $scope.showPanel = false;
@@ -216,6 +239,62 @@ document.addEventListener('DOMContentLoaded', function () {
             {value: 'FACULTY_OF_MEDICINE', label: 'Faculty of Medicine'},
             {value: 'FACULTY_OF_SCIENCE', label: 'Faculty of Science'}
         ];
+
+        $scope.goTo = function(path) {
+            const deptId = $scope.selectedDept?.id || $location.search().department || null;
+            const currentPath = $location.path();
+            const newPath = `/${path}`;
+            const newQuery = deptId ? { department: deptId } : {};
+        
+            // Navigate or reload
+            if (currentPath === newPath) {
+                $location.search(newQuery).replace();
+                $route.reload();
+            } else {
+                $location.path(newPath).search(newQuery);
+            }
+        
+            // Defer jQuery DOM setup after route change and rendering
+            $timeout(() => {
+                $timeout(() => {
+                    ['#studentsTable', '#departmentsTable', '#guidesTable', '#coursesTable'].forEach(id => {
+                        if ($.fn.DataTable.isDataTable(id)) {
+                            $(id).DataTable().destroy();
+                        }
+                        $(id).DataTable({
+                            responsive: true,
+                            pageLength: 10,
+                            destroy: true
+                        });
+                    });
+                }, 200);
+            }, 0);
+        };
+        
+
+        $scope.goBack = function(path) {
+            const deptId = $location.search().department;
+            const newPath = `/${path}`;
+            
+            $location.path(newPath).search({ department: deptId });
+        
+            // Same pattern: wait for render, then apply DataTables
+            $timeout(() => {
+                $timeout(() => {
+                    ['#studentsTable', '#departmentsTable', '#guidesTable', '#coursesTable'].forEach(id => {
+                        if ($.fn.DataTable.isDataTable(id)) {
+                            $(id).DataTable().destroy();
+                        }
+                        $(id).DataTable({
+                            responsive: true,
+                            pageLength: 10,
+                            destroy: true
+                        });
+                    });
+                }, 200);
+            }, 0);
+        };
+        
         // Load departments for dropdowns elsewhere
         $scope.departmentsList = [];
         function refresh() {
@@ -292,7 +371,8 @@ document.addEventListener('DOMContentLoaded', function () {
         };
     }]);
 
-    app.controller('GuideCtrl', ['$scope', 'DataService', function($scope, DataService) {
+    app.controller('GuideCtrl', ['$scope', 'DataService', '$location', '$route', '$timeout', function($scope, DataService, $location, $route, $timeout) {
+        $scope.user = window.CURRENT_USER;
         $scope.formErrors = {};
         $scope.validateGuide = function(guide) {
             $scope.formErrors = {};
@@ -317,13 +397,40 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             return isValid;
         };
+        $scope.goBack = function() {
+            // Navigate back to departments list
+            $location.path('/departments');
+            
+            // Reinitialize DataTables after navigation
+            $timeout(() => {
+                $timeout(() => {
+                    ['#studentsTable', '#departmentsTable', '#guidesTable', '#coursesTable'].forEach(id => {
+                        if ($.fn.DataTable.isDataTable(id)) {
+                            $(id).DataTable().destroy();
+                        }
+                        $(id).DataTable({
+                            responsive: true,
+                            pageLength: 10,
+                            destroy: true
+                        });
+                    });
+                }, 200);
+            }, 0);
+        };
         var _saveGuide = $scope.saveGuide;
         $scope.saveGuide = function() {
             if (!$scope.validateGuide($scope.selectedGuide)) {
                 showToast('Please fix the form errors', 'error');
                 return;
             }
-            _saveGuide.apply(this, arguments);
+            let params = {};
+            if ($scope.user && $scope.user.is_admin && $scope.user.department) {
+                params.department = $scope.user.department;
+            }
+            DataService.save('guides', $scope.selectedGuide, params).then(function() {
+                $scope.closePanel();
+                refresh();
+            });
         };
 
         $scope.guides = [];
@@ -331,7 +438,11 @@ document.addEventListener('DOMContentLoaded', function () {
         $scope.showPanel = false;
         $scope.departmentsList = [];
         function refresh() {
-            DataService.list('guides').then(list => $scope.guides = list);
+            let params = {};
+            if ($scope.user && $scope.user.is_admin && $scope.user.department) {
+                params.department = $scope.user.department;
+            }
+            DataService.list('guides', params).then(list => $scope.guides = list);
             DataService.list('departments').then(list => $scope.departmentsList = list);
         }
         refresh();
@@ -367,7 +478,8 @@ document.addEventListener('DOMContentLoaded', function () {
         };
     }]);
 
-    app.controller('StudentCtrl', ['$scope', 'DataService', function($scope, DataService) {
+    app.controller('StudentCtrl', ['$scope', 'DataService', '$location', '$route', '$timeout', function($scope, DataService, $location, $route, $timeout) {
+        $scope.user = window.CURRENT_USER;
         $scope.formErrors = {};
         $scope.validateStudent = function(student) {
             $scope.formErrors = {};
@@ -395,13 +507,40 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             return isValid;
         };
+        $scope.goBack = function() {
+            // Navigate back to departments list
+            $location.path('/departments');
+            
+            // Reinitialize DataTables after navigation
+            $timeout(() => {
+                $timeout(() => {
+                    ['#studentsTable', '#departmentsTable', '#guidesTable', '#coursesTable'].forEach(id => {
+                        if ($.fn.DataTable.isDataTable(id)) {
+                            $(id).DataTable().destroy();
+                        }
+                        $(id).DataTable({
+                            responsive: true,
+                            pageLength: 10,
+                            destroy: true
+                        });
+                    });
+                }, 200);
+            }, 0);
+        };
         var _saveStudent = $scope.saveStudent;
         $scope.saveStudent = function() {
             if (!$scope.validateStudent($scope.selectedStudent)) {
                 showToast('Please fix the form errors', 'error');
                 return;
             }
-            _saveStudent.apply(this, arguments);
+            let params = {};
+            if ($scope.user && $scope.user.is_admin && $scope.user.department) {
+                params.department = $scope.user.department;
+            }
+            DataService.save('students', $scope.selectedStudent, params).then(function() {
+                $scope.closePanel();
+                refresh();
+            });
         };
 
         $scope.students = [];
@@ -414,7 +553,11 @@ document.addEventListener('DOMContentLoaded', function () {
             'UNDER_EVALUATION', 'VIVA_READY', 'VIVA_COMPLETED', 'COMPLETED', 'DISCONTINUED'
         ];
         function refresh() {
-            DataService.list('students').then(list => $scope.students = list);
+            let params = {};
+            if ($scope.user && $scope.user.is_admin && $scope.user.department) {
+                params.department = $scope.user.department;
+            }
+            DataService.list('students', params).then(list => $scope.students = list);
             DataService.list('courses').then(list => $scope.coursesList = list);
             DataService.list('guides').then(list => $scope.guidesList = list);
         }
@@ -451,7 +594,8 @@ document.addEventListener('DOMContentLoaded', function () {
         };
     }]);
 
-    app.controller('CourseCtrl', ['$scope', 'DataService', function($scope, DataService) {
+    app.controller('CourseCtrl', ['$scope', 'DataService', '$location', '$route', '$timeout', function($scope, DataService, $location, $route, $timeout) {
+        $scope.user = window.CURRENT_USER;
         $scope.formErrors = {};
         $scope.validateCourse = function(course) {
             $scope.formErrors = {};
@@ -476,13 +620,40 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             return isValid;
         };
+        $scope.goBack = function() {
+            // Navigate back to departments list
+            $location.path('/departments');
+            
+            // Reinitialize DataTables after navigation
+            $timeout(() => {
+                $timeout(() => {
+                    ['#studentsTable', '#departmentsTable', '#guidesTable', '#coursesTable'].forEach(id => {
+                        if ($.fn.DataTable.isDataTable(id)) {
+                            $(id).DataTable().destroy();
+                        }
+                        $(id).DataTable({
+                            responsive: true,
+                            pageLength: 10,
+                            destroy: true
+                        });
+                    });
+                }, 200);
+            }, 0);
+        };
         var _saveCourse = $scope.saveCourse;
         $scope.saveCourse = function() {
             if (!$scope.validateCourse($scope.selectedCourse)) {
                 showToast('Please fix the form errors', 'error');
                 return;
             }
-            _saveCourse.apply(this, arguments);
+            let params = {};
+            if ($scope.user && $scope.user.is_admin && $scope.user.department) {
+                params.department = $scope.user.department;
+            }
+            DataService.save('courses', $scope.selectedCourse, params).then(function() {
+                $scope.closePanel();
+                refresh();
+            });
         };
 
         $scope.courses = [];
@@ -490,7 +661,11 @@ document.addEventListener('DOMContentLoaded', function () {
         $scope.showPanel = false;
         $scope.departmentsList = [];
         function refresh() {
-            DataService.list('courses').then(list => $scope.courses = list);
+            let params = {};
+            if ($scope.user && $scope.user.is_admin && $scope.user.department) {
+                params.department = $scope.user.department;
+            }
+            DataService.list('courses', params).then(list => $scope.courses = list);
             DataService.list('departments').then(list => $scope.departmentsList = list);
         }
         refresh();
@@ -525,7 +700,6 @@ document.addEventListener('DOMContentLoaded', function () {
             return d ? d.name : '';
         };
     }]);
-
     // Angular app is ready – log route events
     app.run(['$rootScope', function ($rootScope) {
         $rootScope.$on('$routeChangeError', function (event, current, previous, rejection) {

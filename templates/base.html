@@ -94,6 +94,14 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
     
     <script>
+        //initilaize user data
+        window.CURRENT_USER = {
+            "username": "{{ user.email|escapejs }}",
+            "is_admin": {{ user.is_admin|yesno:"true,false" }},
+            "is_hod": {{ user.is_hod|yesno:"true,false" }},
+            "is_guide": {{ user.is_guide|yesno:"true,false" }},
+            "is_student": {{ user.is_student|yesno:"true,false" }}
+        };
         // Initialize HTMX
         document.body.addEventListener('htmx:configRequest', function(evt) {
             // Add CSRF token to all HTMX requests

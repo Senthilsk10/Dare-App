@@ -144,6 +144,11 @@ class CourseViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         qs = Course.objects.all()
         user = self.request.user
+        if user.is_admin:
+            department = self.request.query_params.get('department')
+            
+            return qs.filter(department=department) if department else qs
+        
         if user.is_hod:
             guide = Guide.objects.filter(email=user.email).first()
             dept = guide.department if guide else None
@@ -156,6 +161,11 @@ class GuideViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         qs = Guide.objects.all()
         user = self.request.user
+        if user.is_admin:
+            department = self.request.query_params.get('department')
+            
+            return qs.filter(department=department) if department else qs
+        
         if user.is_hod:
             guide = Guide.objects.filter(email=user.email).first()
             return qs.filter(department=guide.department) if guide else qs.none()
@@ -167,6 +177,11 @@ class PhDStudentViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         qs = PhDStudent.objects.all()
         user = self.request.user
+        if user.is_admin:
+            department = self.request.query_params.get('department')
+            
+            return qs.filter(course__department__id=department) if department else qs
+        
         if user.is_hod:
             guide = Guide.objects.filter(email=user.email).first()
             dept = guide.department if guide else None
@@ -182,6 +197,11 @@ class DepartmentViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         qs = Department.objects.all()
         user = self.request.user
+        if user.is_admin:
+            department = self.request.query_params.get('department')
+            
+            return qs.filter(id=department) if department else qs
+        
         if user.is_hod:
             guide = Guide.objects.filter(email=user.email).first()
             return qs.filter(id=guide.department.id) if guide else qs.none()

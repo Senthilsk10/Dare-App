@@ -126,6 +126,12 @@ def awaiting_emails_v2(request):
             'calendar_events': calendar_events
         })
     
+    if request.GET.get('api', '').lower() == 'true':
+        return JsonResponse({
+            'evaluators': evaluator_rows,
+            'evaluator_rows_json': evaluator_rows,
+            'calendar_events': calendar_events
+        })
     # Return HTML response for web view
     return render(request, 'communications/awaiting_mails.html', {
         'evaluator_rows': evaluator_rows,
@@ -304,8 +310,14 @@ def awaiting_project_emails(request):
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return JsonResponse({'evaluators': evaluator_rows, 'calendar_events': calendar_events})
 
-    print("evaluator_rows",evaluator_rows)
-    print("calendar_events",calendar_events)
+    # print("evaluator_rows",evaluator_rows)
+    # print("calendar_events",calendar_events)
+    if request.GET.get('api', '').lower() == 'true':
+        return JsonResponse({
+            'evaluators': evaluator_rows,
+            'evaluator_rows_json': evaluator_rows,
+            'calendar_events': calendar_events
+        })
     return render(request, 'communications/awaiting_project_emails.html', {
         'evaluator_rows': evaluator_rows,
         'evaluator_rows_json': json.dumps(evaluator_rows),

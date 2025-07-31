@@ -7,7 +7,11 @@
   <div class="flex-1 p-6 overflow-y-auto" ng-class="{'pr-96': showPanel}">
     <div class="flex justify-between items-center mb-4">
       <h2 class="text-2xl font-semibold">Guides</h2>
-      <button class="px-4 py-2 bg-green-600 text-white rounded shadow" ng-click="openPanelForNew()">Add Guide</button>
+      <div class="flex gap-2 ml-auto">
+        <button class="px-4 py-2 bg-green-600 text-white rounded shadow" ng-click="openPanelForNew()">Add Guide</button>
+        <button ng-if="user.is_admin" class="px-4 py-2 bg-green-600 text-white rounded shadow" ng-click="goBack('departments')">Back</button>
+      </div>
+    
     </div>
     <table id="guidesTable" class="min-w-full bg-white rounded shadow">
       <thead>
