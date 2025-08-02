@@ -92,6 +92,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 templateUrl: '/static/js/partials/courses.html',
                 controller: 'CourseCtrl'
             })
+            .when('/mailings', {
+                templateUrl: '/static/js/partials/mailings.html',
+                controller: 'MailingsCtrl'
+            })
             .otherwise({ redirectTo: '/departments' });
     }]);
 
@@ -699,6 +703,181 @@ document.addEventListener('DOMContentLoaded', function () {
             var d = $scope.departmentsList.find(x => x.id === deptId);
             return d ? d.name : '';
         };
+    }]);
+    
+    // Mailing List / Calendar Controller
+    app.controller('MailingsCtrl', ['$scope', '$http', '$timeout', function($scope, $http, $timeout) {
+        let calendar = null;
+         // State
+         $scope.year = new Date().getFullYear();
+         $scope.month = new Date().getMonth() + 1;
+         $scope.mailType = 'approach';
+         $scope.summary = {};
+         $scope.entries = [];
+         $scope.calendarDays = [];
+         $scope.selected = null;
+         const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value || 
+                document.querySelector('meta[name=csrf-token]').getAttribute('content');
+        $http.defaults.headers.common['X-CSRFToken'] = csrfToken;
+
+        $scope.generateCalendar = function() {
+            $scope.calendarDays = [];
+            const daysInMonth = new Date($scope.year, $scope.month, 0).getDate();
+            for (let d = 1; d <= daysInMonth; d++) {
+                const key = `${$scope.year}-${('0' + $scope.month).slice(-2)}-${('0' + d).slice(-2)}`;
+                const count = ($scope.summary[key] || {})[$scope.mailType] || 0;
+                $scope.calendarDays.push({ year: $scope.year, month: $scope.month, date: d, key, count });
+            }
+        };
+         // Fetch monthly entries, build counts, and refresh calendar
+         $scope.loadSummary = function() {
+             $http.get('/api/email-list/', { params: { year: $scope.year, month: $scope.month, type: $scope.mailType } }).then(r => {
+                 const list = r.data || [];
+                 // ensure dates formatted and build summary map
+                 const summary = {};
+                 list.forEach(item=>{
+                    console.log('item',item);
+                     // format next dates to YYYY-MM-DD for binding
+                     if(item.next_approach_email_date){
+                         item.next_approach_email_date = item.next_approach_email_date.slice(0,10);
+                     }
+                     if(item.next_evaluation_email_date){
+                         item.next_evaluation_email_date = item.next_evaluation_email_date.slice(0,10);
+                     }
+                     let keyVal = $scope.mailType==='approach' ? item.next_approach_email_date : item.next_evaluation_email_date;
+                     if(keyVal){
+                         if(keyVal instanceof Date){
+                             keyVal = `${keyVal.getFullYear()}-${('0'+(keyVal.getMonth()+1)).slice(-2)}-${('0'+keyVal.getDate()).slice(-2)}`;
+                         }
+                         if(!summary[keyVal]) summary[keyVal] = {approach:0, project:0};
+                         summary[keyVal][$scope.mailType] += 1;
+                     }
+                 });
+                 $scope.summary = summary;
+                 $scope.generateCalendar();
+                 $timeout(renderCalendar, 0);
+             });
+         };
+
+        // Select a date and load details
+        $scope.selectDate = function(day) {
+             const dateStr = `${day.year}-${('0'+day.month).slice(-2)}-${('0'+day.date).slice(-2)}`;
+             $http.get('/api/email-details/', { params: { date: dateStr, type: $scope.mailType } }).then(r => {
+                // console.log(r.data,day);
+                $scope.entries = r.data;
+                $scope.selected = null;
+            });
+        };
+
+        // Open detail panel
+        function toInputDate(val){
+            // console.log("date:" , val);
+            if(!val) return '';
+            
+            return new Date(val);
+        }
+
+        $scope.openDetail = function(entry) {
+            const cloned = angular.copy(entry);
+            cloned.next_approach_email_date = toInputDate(cloned.next_approach_email_date);
+            cloned.next_evaluation_email_date = toInputDate(cloned.next_evaluation_email_date);
+            $scope.selected = cloned;
+        };
+
+        // Close detail panel
+        $scope.closeDetail = function() {
+            $scope.selected = null;
+            if(calendar){
+                $timeout(()=>{ calendar.updateSize(); }, 0);
+            }
+        };
+
+        // Close list panel
+        $scope.closeList = function() {
+            $scope.entries = [];
+            $scope.selected = null;
+            if(calendar){
+                $timeout(()=>{ calendar.updateSize(); }, 0);
+            }
+        };
+
+        // Switch mail type and reload
+        $scope.switchMailType = function(type) {
+            if ($scope.mailType === type) return;
+            $scope.mailType = type;
+            $scope.closeList();
+            $scope.loadSummary();
+        };
+
+
+
+
+        // Update next email date
+        $scope.updateNextDate = function(type) {
+            
+            $http.post('/api/email-details/', {
+                id: $scope.selected.id,
+                type: type,
+                next_date: type === 'approach' ? $scope.selected.next_approach_email_date : $scope.selected.next_evaluation_email_date
+            }).then(() => {
+                $scope.loadSummary();
+                $scope.selectDate({ year: $scope.year, month: $scope.month, date: new Date($scope.selected.next_approach_email_date || $scope.selected.next_evaluation_email_date).getDate() });
+            });
+        };
+
+        // Send email
+        $scope.sendEmail = function(isProject) {
+            const url = isProject ? '/send-project-email/' : '/send-email/';
+            $http.post(url, { project_pool_id: $scope.selected.id }).then(() => {
+                $scope.loadSummary();
+            });
+        };
+
+        function renderCalendar() {
+            if (!window.FullCalendar) { console.warn('FullCalendar not loaded'); return; }
+            const calEl = document.getElementById('mailing-calendar');
+            if (!calEl) return;
+            const events = [];            
+            for (const [dateKey, obj] of Object.entries($scope.summary)) {
+                if (obj && obj[$scope.mailType] > 0) {
+                    events.push({ title: obj[$scope.mailType].toString(), start: dateKey, allDay: true, backgroundColor:'#3182ce', borderColor:'#3182ce', textColor:'#fff' });
+                }
+            }
+            if(!calendar){
+                calendar = new FullCalendar.Calendar(calEl, {
+                initialView: 'dayGridMonth',
+                initialDate: `${$scope.year}-${('0'+$scope.month).slice(-2)}-01`,
+                height: 'auto',
+                events: events,
+                handleWindowResize: true,
+                windowResizeDelay: 200,
+                dateClick: function(info) {
+                     const clickedDate = info.date;
+                    //  $scope.selectedDate = dateStr;
+                     $scope.selectDate({year:clickedDate.getFullYear(), month: clickedDate.getMonth()+1, date: clickedDate.getDate()});
+                 },
+                datesSet: function(info){
+                    const dt = (info.view && info.view.currentDate) ? info.view.currentDate: calendar.getDate();
+                    const newYear  = dt.getFullYear();
+                    const newMonth = dt.getMonth() + 1;
+                    if(newYear!==$scope.year || newMonth!==$scope.month){
+                        $scope.$apply(()=>{
+                            $scope.year=newYear;
+                            $scope.month=newMonth;
+                        });
+                        $scope.loadSummary();
+                    }
+                }
+            });
+                calendar.render();
+            } else {
+                calendar.removeAllEvents();
+                events.forEach(ev=>calendar.addEvent(ev));
+            }
+        }
+
+        // Init
+        $scope.loadSummary();
     }]);
     // Angular app is ready – log route events
     app.run(['$rootScope', function ($rootScope) {

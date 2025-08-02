@@ -23,5 +23,6 @@ urlpatterns = [
     path('api/email-summary/', views.MonthlyEmailCountAPI.as_view()),
     path('api/email-list/', views.MonthlyEmailListAPI.as_view()),
     path('api/email-details/', views.DailyEmailDetailsAPI.as_view()),
+    # path('api/email-next-date/', views.NextEmailDateAPI.as_view()),
 ]
 

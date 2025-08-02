@@ -1,0 +1,83 @@
+<!-- Mailing List / Calendar Partial -->
+<!-- FullCalendar assets (only loaded for this partial) -->
+<div class="flex h-[calc(100vh-4rem)]" ng-controller="MailingsCtrl">
+
+
+    <!-- Calendar Panel & Controls -->
+    <div class="flex-1 p-4 overflow-auto" id="calendar-container">
+        <!-- Mail type toggle -->
+        <div class="mb-4 flex space-x-2">
+            <button ng-class="{'bg-blue-600 text-white': mailType==='approach', 'bg-gray-200': mailType!=='approach'}" class="px-4 py-1 rounded" ng-click="switchMailType('approach')">Approach</button>
+            <button ng-class="{'bg-blue-600 text-white': mailType==='project', 'bg-gray-200': mailType!=='project'}" class="px-4 py-1 rounded" ng-click="switchMailType('project')">Project</button>
+        </div>
+        <div id="mailing-calendar"></div>
+    </div>
+
+    <!-- Entries List Panel -->
+    <div class="w-1/3 border-l p-4 overflow-y-auto" ng-class="{'hidden': !entries.length}">
+        <div class="flex justify-between items-center mb-2">
+            <h3 class="font-semibold">Entries</h3>
+            <button class="text-gray-500 hover:text-gray-700 text-md" ng-click="closeList()">×</button>
+        </div>
+        <!-- <h3 class="font-semibold mb-2">Entries for {{selectDate}}</h3> -->
+        <ul class="divide-y">
+            <li ng-repeat="e in entries" class="py-2 cursor-pointer hover:bg-gray-100" ng-click="openDetail(e)">
+                <div class="flex justify-between text-sm">
+                    <span>{{e.project_code}}</span>
+                    <span class="italic text-gray-500">{{e.evaluator_type}}</span>
+                </div>
+                <div class="text-xs text-gray-600">{{e.evaluator_email}}</div>
+            </li>
+            <li ng-if="!entries.length" class="text-gray-500 text-sm py-2">No entries</li>
+        </ul>
+    </div>
+
+    <!-- Slide-in Detail Panel -->
+    <div class="w-1/2 border-l p-6 overflow-y-auto" ng-show="selected">
+        <div class="p-6 h-full flex flex-col" ng-if="selected">
+            <div class="flex justify-between items-start mb-4">
+                <h3 class="text-lg font-semibold">{{selected.project_code}}</h3>
+                <button class="text-gray-500 hover:text-gray-700" ng-click="closeDetail()">×</button>
+            </div>
+
+            <div class="space-y-3 flex-1 overflow-y-auto">
+                <p><span class="font-medium">Evaluator:</span> {{selected.evaluator_email}}</p>
+                <p><span class="font-medium">Type:</span> {{selected.evaluator_type}}</p>
+
+                <!-- Approach date field/button if available -->
+                <div ng-if="selected.next_approach_email_date">
+                    <label class="block text-sm font-medium">Next Approach Date</label>
+                    <input type="date" ng-model="selected.next_approach_email_date" class="w-full border rounded p-1" />
+                    <button class="mt-1 px-3 py-1 bg-blue-600 text-white rounded text-sm" ng-click="updateNextDate('approach')">Save</button>
+                </div>
+                <!-- Evaluation date field/button if available -->
+                <div ng-if="selected.next_evaluation_email_date">
+                    <label class="block text-sm font-medium">Next Evaluation Date</label>
+                    <input type="date" ng-model="selected.next_evaluation_email_date" class="w-full border rounded p-1" />
+                    <button class="mt-1 px-3 py-1 bg-blue-600 text-white rounded text-sm" ng-click="updateNextDate('project')">Save</button>
+                </div>
+
+                <!-- Email preview (subject/body if JSON, else fallback) -->
+                <div>
+                    <label class="block text-sm font-medium">Email Preview</label>
+                    <div class="border rounded p-2 text-xs bg-gray-50" style="white-space:pre-line">
+                        <div ng-if="isJson(selected.email_content)">
+                            <div class="font-semibold">Subject:</div>
+                            <div class="mb-2">{{parseJson(selected.email_content).subject}}</div>
+                            <div class="font-semibold">Body:</div>
+                            <div>{{parseJson(selected.email_content).body}}</div>
+                        </div>
+                        <div ng-if="!isJson(selected.email_content)">
+                            {{selected.email_content}}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pt-4 border-t space-x-2">
+                <button ng-if="selected.next_approach_email_date && mailType==='approach'" class="px-4 py-2 bg-green-600 text-white rounded" ng-click="sendEmail(false)">Send Approach</button>
+                <button ng-if="selected.next_evaluation_email_date && mailType==='project'" class="px-4 py-2 bg-green-600 text-white rounded" ng-click="sendEmail(true)">Send Evaluation</button>
+            </div>
+        </div>
+    </div>
+</div>

@@ -3,6 +3,8 @@ from .models import AdminNotification
 from projects.models import Project,VersionedProjectEvaluatorPool
 from users.models import Evaluator
 from communications.utils import send_evaluator_approach_email,send_thesis_submission_email
+import datetime
+import datetime
 
 class AdminNotificationSerializer(serializers.ModelSerializer):
     class Meta:
@@ -36,7 +38,8 @@ class EvaluatorMailListSerializer(serializers.ModelSerializer):
     evaluator_type = serializers.CharField(source='evaluator.evaluator_type')
     project_code = serializers.CharField(source='project.referel_id', read_only=True)
     student_id = serializers.CharField(source='project.student.student_id', read_only=True)
-
+    next_approach_email_date = serializers.SerializerMethodField()
+    next_evaluation_email_date = serializers.SerializerMethodField()
     class Meta:
         model = VersionedProjectEvaluatorPool
         fields = [
@@ -51,6 +54,14 @@ class EvaluatorMailListSerializer(serializers.ModelSerializer):
             'approach_mail_count',
             'report_mail_count',
         ]
+
+    def get_next_approach_email_date(self, obj):
+        date = obj.next_approach_email_date
+        return date.strftime('%Y-%m-%d') if date else datetime.datetime.now().strftime('%Y-%m-%d')
+    def get_next_evaluation_email_date(self, obj):
+        date = obj.next_evaluation_email_date
+        return date.strftime('%Y-%m-%d') if date else datetime.datetime.now().strftime('%Y-%m-%d')
+
 
 
 class EvaluatorDetailSerializer(serializers.ModelSerializer):
@@ -59,7 +70,8 @@ class EvaluatorDetailSerializer(serializers.ModelSerializer):
     student_id = serializers.CharField(source='project.student.student_id')
     evaluator_type = serializers.CharField(source='evaluator.evaluator_type')
     email_content = serializers.SerializerMethodField()
-    
+    next_approach_email_date = serializers.SerializerMethodField()
+    next_evaluation_email_date = serializers.SerializerMethodField()
 
     class Meta:
         model = VersionedProjectEvaluatorPool
@@ -74,10 +86,18 @@ class EvaluatorDetailSerializer(serializers.ModelSerializer):
             'next_evaluation_email_date',
             'approach_mail_count',
             'report_mail_count',
-            'email_content'
+            'email_content',
         ]
 
     def get_email_content(self, obj):
         mail_type = self.context.get('mail_type', 'approach')
-        
         return send_evaluator_approach_email(obj.project, obj) if mail_type == 'approach' else send_thesis_submission_email(obj.project, obj)
+
+    def get_next_approach_email_date(self, obj):
+        date = obj.next_approach_email_date
+        return date.strftime('%Y-%m-%d') if date else datetime.datetime.now().strftime('%Y-%m-%d')
+
+    def get_next_evaluation_email_date(self, obj):
+        date = obj.next_evaluation_email_date
+        return date.strftime('%Y-%m-%d') if date else datetime.datetime.now().strftime('%Y-%m-%d')
+   

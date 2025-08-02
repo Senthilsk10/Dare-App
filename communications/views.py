@@ -674,9 +674,29 @@ class DailyEmailDetailsAPI(APIView):
         except Exception:
             return Response({"error": "Invalid date format, expected YYYY-MM-DD."}, status=400)
 
-        eligible_entries = get_eligible_entries_by_day(date_obj, mail_type)
+        eligible_entries = get_eligible_entries_by_day(date_obj, mail_type)  
         # return Response(eligible_entries, status=200)
         # print(eligible_entries)
         serializer = EvaluatorDetailSerializer(eligible_entries,context={'mail_type': mail_type}, many=True)
         # 
         return Response(serializer.data, status=200)
+
+    def post(self, request):
+        try:
+            project_pool_id = request.data.get("id")
+            mail_type = request.data.get("type", "approach")
+            date = request.data.get("next_date", "approach")
+            print(project_pool_id,mail_type,date)
+            if mail_type == 'approach':
+                VersionedProjectEvaluatorPool.objects.filter(id=project_pool_id).update(
+                next_approach_email_date=date
+            )
+            else:
+                VersionedProjectEvaluatorPool.objects.filter(id=project_pool_id).update(
+                    next_evaluation_email_date=date
+                )
+                
+            return Response({"message": "Date updated successfully"}, status=200)
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)
+            
