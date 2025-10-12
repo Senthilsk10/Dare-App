@@ -107,7 +107,7 @@ class Department(models.Model):
     """Academic departments offering PhD programs"""
     name = models.CharField(max_length=200)
     code = models.CharField(max_length=10, unique=True)
-    faculty = models.CharField(max_length=200,choices=FACULTY_CHOICES,default='FACULTY_OF_ENGINEERING_TECHNOLOGY')
+    faculty = models.CharField(max_length=200,choices=FACULTY_CHOICES,default='FACULTY_OF_ENGINEERING_TECHNOLOGY') # may be in production to remove the default and go on with correct implementations
     head_of_department = models.CharField(max_length=200)
     contact_email = models.EmailField()
     phone = models.CharField(max_length=20, blank=True)

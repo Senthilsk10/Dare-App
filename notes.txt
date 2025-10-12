@@ -1,0 +1,91 @@
+/mails/ - list of sent mails with filter option to sort emails sent by admin
+
+/mails/<project_id>/ - list of sent mails with filter option to sort emails sent for a specific project
+
+/mails/approach/ - list of emails to be sent for each project that's due date is today - scanned by projects.get_Evaluators()
+    - from this site admin can create communication model by clicking send btn we fix , their which calls evaluator send button
+
+/mails/evaluation/ - show mails to be sent for assigned evaluators regarding the project thesis pdf submission.
+
+/mails/evaluation-remainder/ - show mails to be sent for assigned evaluators after 45 days of evaluation mail sent.
+
+mails/response/ - show mails that recieved from evaluators - fetch the project for the mail using referal id so the admin can work on that project to edit 
+    - allow admin to mark evaluator by accept or reject content in the mail if project has not have evaluators assigned. 
+
+
+
+in webhooklog model there is a processing error field available use this field to add  evaluation result in their for notifiing the users
+
+
+Yes, you **can** still use sessions and other headers (like authentication tokens) for user authorization even when consuming a Django REST API in your templates. However, the **approach** depends on **how** you're consuming the API and how authentication is set up.
+
+### There are two common scenarios:
+
+---
+
+## ✅ 1. **Using Django Templates + Django REST Framework (DRF) with Session Authentication**
+
+### Scenario:
+
+* You use Django templates (like `render(request, "my_template.html")`)
+* You call your own Django REST API endpoints via JavaScript (AJAX or `fetch`) within those templates.
+* Users log in via Django's normal login mechanism (e.g., `django.contrib.auth` views)
+
+### How it works:
+
+* The session ID (usually stored in the `sessionid` cookie) is automatically included in requests made from the browser to the same domain.
+* The REST API can use **SessionAuthentication** (in Django REST Framework) to authorize those requests.
+
+#### So yes:
+
+You **can** use sessions and the `request.user` will still be valid in the API views.
+
+### Requirements:
+
+* Make sure your REST API view uses `SessionAuthentication` or `IsAuthenticated` permissions.
+* If using `fetch`, ensure the request includes credentials:
+
+```js
+fetch('/api/some-endpoint/', {
+  method: 'GET',
+  credentials: 'include'  // <--- this is crucial
+});
+```
+
+---
+
+## ❗ 2. **Using REST APIs Cross-Origin or with Token Auth (e.g., JWT)**
+
+### Scenario:
+
+* You call your API from a different domain or you are not using Django login views (e.g., mobile apps, SPAs, etc.).
+* You're using **token-based auth**, like JWT or DRF's TokenAuthentication.
+
+### In this case:
+
+* Sessions are NOT used.
+* Instead, you must send an `Authorization` header with each API request, like:
+
+```js
+fetch('https://api.example.com/data/', {
+  headers: {
+    'Authorization': 'Bearer <your_token>'
+  }
+});
+```
+
+---
+
+### 🔐 Summary Table:
+
+| Setup                       | Can Use Session? | Auth Header Needed? | Notes                                                    |
+| --------------------------- | ---------------- | ------------------- | -------------------------------------------------------- |
+| Django templates + DRF      | ✅ Yes            | ❌ No (by default)   | Use `SessionAuthentication` and `credentials: "include"` |
+| Cross-origin or token-based | ❌ No             | ✅ Yes               | Use `TokenAuthentication` or JWT                         |
+| SPA frontend (React, etc.)  | ❌ No             | ✅ Yes               | Sessions don’t work cross-origin                         |
+
+---
+
+If you're sticking with Django templates and same-origin API calls, using sessions for user auth is completely valid and works seamlessly.
+
+Let me know your exact setup (e.g., login flow, how API is consumed), and I can provide more tailored advice.

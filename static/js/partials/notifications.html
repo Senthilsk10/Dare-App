@@ -1,0 +1,178 @@
+<div class="container mx-auto px-4 py-6" ng-cloak>
+    <!-- Header -->
+    <div class="bg-white rounded-lg shadow-sm border mb-6">
+        <div class="px-6 py-4 border-b">
+            <h1 class="text-2xl font-bold text-gray-900">
+                <i class="fas fa-bell mr-2 text-blue-600"></i>
+                Admin Notifications
+            </h1>
+        </div>
+        <!-- Filters (optional, can enhance later) -->
+        <!-- Tabs -->
+        <div class="px-6">
+            <div class="flex border-b">
+                <button ng-click="setActiveTab('unread')"
+                        ng-class="{'border-b-2 border-blue-600 text-blue-600': activeTab === 'unread', 'text-gray-600': activeTab !== 'unread'}"
+                        class="px-4 py-3 font-medium text-sm focus:outline-none">
+                    <i class="fas fa-envelope mr-2"></i>
+                    Unread ({{ unreadCount }})
+                </button>
+                <button ng-click="setActiveTab('read')"
+                        ng-class="{'border-b-2 border-blue-600 text-blue-600': activeTab === 'read', 'text-gray-600': activeTab !== 'read'}"
+                        class="px-4 py-3 font-medium text-sm focus:outline-none ml-6">
+                    <i class="fas fa-envelope-open mr-2"></i>
+                    Read ({{ readCount }})
+                </button>
+            </div>
+        </div>
+        <!-- Notifications list -->
+        <div class="px-6 py-4" ng-show="!loading && notifications.length === 0">
+            <div class="text-center py-12">
+                <i class="fas fa-inbox text-4xl text-gray-400 mb-4"></i>
+                <h3 class="text-lg font-medium text-gray-900 mb-2">No notifications found</h3>
+                <p class="text-gray-600">{{ activeTab === 'unread' ? 'All caught up! No unread notifications.' : 'No read notifications to display.' }}</p>
+            </div>
+        </div>
+        <div class="px-0" ng-show="!loading && notifications.length">
+            <div ng-repeat="notification in notifications"
+                 ng-click="openPanel(notification)"
+                 class="px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors duration-150"
+                 ng-class="{'bg-blue-50 border-l-4 border-l-blue-500': !notification.is_read}">
+                <div class="flex items-start justify-between">
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center space-x-2 mb-2">
+                            <!-- Notification type -->
+                            <span class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">
+                                {{ notification.notification_type }}
+                            </span>
+                            <!-- Unread dot -->
+                            <span ng-show="!notification.is_read" class="w-2 h-2 bg-blue-600 rounded-full"></span>
+                        </div>
+                        <h3 class="text-md font-semibold text-gray-900 mb-1">{{ notification.title }}</h3>
+                        <p class="text-sm text-gray-600 mb-1">
+                            <i class="fas fa-envelope mr-1"></i> From: {{ notification.from_email }}
+                        </p>
+                        <p class="text-sm text-gray-700 line-clamp-2">{{ notification.message | limitTo: 150 }}{{ notification.message.length > 150 ? '...' : '' }}</p>
+                    </div>
+                    <div class="flex flex-col items-end space-y-2 ml-4">
+                        <span class="text-xs text-gray-500">{{ notification.created_at | date:'shortDate' }}</span>
+                        <i class="fas fa-chevron-right text-gray-400"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Loading spinner -->
+        <div ng-show="loading" class="text-center py-8">
+            <i class="fas fa-spinner fa-spin text-2xl text-blue-600"></i>
+            <p class="text-gray-600 mt-2">Loading notifications...</p>
+        </div>
+        <!-- Pagination -->
+        <div ng-show="totalPages > 1" class="mt-6 flex justify-center pb-6">
+            <nav class="inline-flex rounded-md shadow">
+                <button ng-click="goToPage(currentPage - 1)"
+                        ng-disabled="currentPage <= 1"
+                        class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-l-md hover:bg-gray-50 disabled:opacity-50">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <button ng-repeat="page in getPageRange()"
+                        ng-click="goToPage(page)"
+                        ng-class="{'bg-blue-600 text-white': page === currentPage, 'bg-white text-gray-700': page !== currentPage}"
+                        class="px-3 py-2 text-sm font-medium border-t border-b border-gray-300">
+                    {{ page }}
+                </button>
+                <button ng-click="goToPage(currentPage + 1)"
+                        ng-disabled="currentPage >= totalPages"
+                        class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-r-md hover:bg-gray-50 disabled:opacity-50">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </nav>
+        </div>
+    </div>
+
+    <!-- Slide-in Panel -->
+    <div class="fixed inset-0 z-40" ng-show="showPanel">
+        <div class="absolute inset-0 bg-black opacity-50" ng-click="closePanel()"></div>
+        <div class="absolute right-0 top-0 h-full w-full max-w-lg bg-white shadow-xl transform transition-transform duration-300"
+             ng-class="{'translate-x-0': showPanel, 'translate-x-full': !showPanel}">
+            <div class="h-full flex flex-col">
+                <div class="px-6 py-4 border-b flex items-center justify-between bg-gray-50">
+                    <h2 class="text-xl font-bold text-gray-900">Notification Details</h2>
+                    <button ng-click="closePanel()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                <div class="flex-1 overflow-y-auto p-6" ng-if="selectedNotification">
+                    <!-- Priority badge -->
+                    <div class="flex items-center space-x-2 mb-3">
+                        <!-- <span class="px-3 py-1 text-sm font-medium rounded-full"
+                              ng-class="{
+                                  'bg-red-100 text-red-800': selectedNotification.priority === 'URGENT',
+                                  'bg-orange-100 text-orange-800': selectedNotification.priority === 'HIGH',
+                                  'bg-yellow-100 text-yellow-800': selectedNotification.priority === 'MEDIUM',
+                                  'bg-green-100 text-green-800': selectedNotification.priority === 'LOW'
+                              }">
+                            <!-- {{ selectedNotification.priority }} -->
+                        </span> -->
+                    </div>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">Subject: {{ selectedNotification.title }}</h3>
+                    <p class="text-sm text-gray-600 mb-4"><i class="fas fa-envelope mr-2"></i>From: {{ selectedNotification.from_email }}</p>
+                    <div class="bg-gray-50 rounded-lg p-4 mb-6">
+                        <p class="text-gray-800 whitespace-pre-wrap">{{ selectedNotification.message }}</p>
+                    </div>
+                    <!-- Assignment form (simplified) -->
+                    <h4 class="text-lg font-semibold text-gray-900 mb-4">Assignment Details</h4>
+                    <form ng-submit="updateNotification()" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Assign to Project <span class="text-red-500">*</span></label>
+                            <select ng-model="assignmentData.project_id" required class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none">
+                                <option value="">Select a project...</option>
+                                <option ng-repeat="p in projects" value="{{ p.id }}">{{ p.student_roll }}</option>
+                            </select>
+                        </div>
+                        <!-- Additional flags checkboxes can be added similarly -->
+                         <!-- Assign Evaluator Checkbox -->
+                        <div class="flex items-center mb-2">
+                            <input type="checkbox" id="assignEvaluator" ng-model="assignmentData.assign_evaluator" class="mr-2">
+                            <label for="assignEvaluator" class="text-sm text-gray-700">Assign evaluator for this project (Evaluator agreed to evaluate)</label>
+                        </div>
+                        <!-- Reject Checkbox -->
+                        <div class="flex items-center mb-2">
+                            <input type="checkbox" id="rejectRequest" ng-model="assignmentData.reject_request" class="mr-2">
+                            <label for="rejectRequest" class="text-sm text-gray-700">Reject this request to work on the Evaluation (will be removed from mailing list and assigned evaluators)</label>
+                        </div>
+                        <!-- Evaluator found errors -->
+                        <div class="flex items-center mb-2">
+                            <input type="checkbox" id="foundErrors" ng-model="assignmentData.found_errors" class="mr-2">
+                            <label for="foundErrors" class="text-sm text-gray-700">Evaluator found errors in evaluation (project file will be marked with error and student notified.) </label>
+                        </div>
+                        <div ng-show="assignmentData.found_errors" class="ml-6 mb-2">
+                            <label class="block text-xs text-gray-600 mb-1">Message to student (from evaluator):</label>
+                            <textarea ng-model="assignmentData.evaluator_message" rows="2" class="w-full border rounded p-2 mb-2"></textarea>
+                            <div class="flex items-center mb-2">
+                                <input type="checkbox" id="includeAttachment" ng-model="assignmentData.include_attachment" class="mr-2">
+                                <label for="includeAttachment" class="text-xs text-gray-700">Include attachment for student(if any attachments to be send)</label>
+                            </div>
+                        </div>
+                        <!-- Evaluator found no errors -->
+                        <div class="flex items-center mb-2">
+                            <input type="checkbox" id="noErrors" ng-model="assignmentData.no_errors" class="mr-2">
+                            <label for="noErrors" class="text-sm text-gray-700">Evaluator found no errors (project file will be marked as completed and moved to viva)</label>
+                        </div>
+                        <!-- Payment enquiry -->
+                        <div class="flex items-center mb-2">
+                            <input type="checkbox" id="paymentEnquiry" ng-model="assignmentData.payment_enquiry" class="mr-2">
+                            <label for="paymentEnquiry" class="text-sm text-gray-700">Evaluator enquired about payment (set payment status to pending)</label>
+                        </div>
+                        <div class="flex justify-end space-x-3 pt-4">
+                            <button type="button" ng-click="closePanel()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300">Cancel</button>
+                            <button type="submit" ng-disabled="updating" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50">
+                                <i ng-show="updating" class="fas fa-spinner fa-spin mr-2"></i>
+                                {{ updating ? 'Updating...' : 'Mark as Read & Assign' }}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

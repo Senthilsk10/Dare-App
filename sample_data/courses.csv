@@ -1,0 +1,3 @@
+code,name,department_code,credits,min_project_semester,fee_per_semester
+CSE101,Advanced Algorithms,CSE,24,3,50000
+ECE201,Digital Signal Processing,ECE,24,3,48000

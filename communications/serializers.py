@@ -57,6 +57,7 @@ class EvaluatorMailListSerializer(serializers.ModelSerializer):
 
     def get_next_approach_email_date(self, obj):
         date = obj.next_approach_email_date
+        print(date,obj)
         return date.strftime('%Y-%m-%d') if date else datetime.datetime.now().strftime('%Y-%m-%d')
     def get_next_evaluation_email_date(self, obj):
         date = obj.next_evaluation_email_date

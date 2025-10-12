@@ -1,0 +1,3 @@
+email,name,department_code,is_hod,designation,specialization,phone,is_active,max_students
+akshay@example.edu,Dr. Akshay Patil,CSE,true,Professor,Distributed Systems,+91-9000000001,true,5
+sudha@example.edu,Dr. Sudha Menon,ECE,false,Associate Professor,VLSI Design,+91-9000000002,true,4

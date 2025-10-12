@@ -96,6 +96,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 templateUrl: '/static/js/partials/mailings.html',
                 controller: 'MailingsCtrl'
             })
+            .when('/notifications', {
+                templateUrl: '/static/js/partials/notifications.html',
+                controller: 'NotificationCtrl'
+            })
             .otherwise({ redirectTo: '/departments' });
     }]);
 
@@ -879,6 +883,100 @@ document.addEventListener('DOMContentLoaded', function () {
         // Init
         $scope.loadSummary();
     }]);
+    // Notification Controller
+    app.controller('NotificationCtrl', ['$scope', '$http', '$timeout', function($scope, $http, $timeout) {
+        $scope.notifications = [];
+        $scope.activeTab = 'unread';
+        $scope.unreadCount = 0;
+        $scope.readCount = 0;
+        $scope.currentPage = 1;
+        $scope.pageSize = 20;
+        $scope.totalPages = 1;
+        $scope.loading = false;
+        $scope.showPanel = false;
+        $scope.selectedNotification = null;
+        $scope.assignmentData = {};
+        $scope.projects = [];
+        $scope.updating = false;
+
+        const NOTIFICATIONS_URL = '/api/admin-notifications/';
+        const PROJECTS_URL = '/api/projects/';
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value || document.querySelector('meta[name=csrf-token]').getAttribute('content');
+        $http.defaults.headers.common['X-CSRFToken'] = csrfToken;
+
+        function loadCounts() {
+            $http.get(NOTIFICATIONS_URL + 'counts/').then(function(r){
+                $scope.unreadCount = r.data.unread_count || 0;
+                $scope.readCount = r.data.read_count || 0;
+            });
+        }
+
+        function loadNotifications() {
+            $scope.loading = true;
+            const params = {
+                page: $scope.currentPage,
+                page_size: $scope.pageSize,
+                is_read: $scope.activeTab === 'read'
+            };
+            $http.get(NOTIFICATIONS_URL, { params: params }).then(function(r){
+                $scope.notifications = r.data.results || [];
+                $scope.totalPages = Math.ceil((r.data.count || 0) / $scope.pageSize);
+                $scope.loading = false;
+            }).catch(function(){ $scope.loading = false; });
+        }
+
+        $scope.setActiveTab = function(tab){
+            $scope.activeTab = tab;
+            $scope.currentPage = 1;
+            loadNotifications();
+        };
+
+        $scope.openPanel = function(notification){
+            console.log(notification);
+            // get projects related to the mail (find student id or from email or project id)
+            // but now i will simulate with all projects only
+            $scope.projects = $http.get(PROJECTS_URL).then(function(r){
+                console.log('r',r,'data',r.data);
+                $scope.projects = r.data || [];
+                console.log($scope.projects);
+            });
+            
+            $scope.selectedNotification = notification;
+            $scope.showPanel = true;
+            $scope.assignmentData = { project_id: notification.project_id || '', notification_type: notification.notification_type };
+        };
+
+        $scope.closePanel = function(){
+            $scope.showPanel = false;
+            $scope.selectedNotification = null;
+            $scope.assignmentData = {};
+        };
+
+        $scope.updateNotification = function(){
+            if(!$scope.selectedNotification) return;
+            let data = Object.assign({}, $scope.assignmentData, { id: $scope.selectedNotification.id, email: $scope.selectedNotification.from_email, is_read: true });
+            $http.patch(NOTIFICATIONS_URL + $scope.selectedNotification.id + '/', data).then(function(){
+                $scope.closePanel();
+                loadCounts();
+                loadNotifications();
+            });
+        };
+
+        $scope.getPageRange = function(){
+            const range = [];
+            const start = Math.max(1, $scope.currentPage-2);
+            const end = Math.min($scope.totalPages, $scope.currentPage+2);
+            for(let i=start;i<=end;i++) range.push(i);
+            return range;
+        };
+
+        $scope.goToPage = function(p){ if(p>=1 && p<= $scope.totalPages){ $scope.currentPage=p; loadNotifications(); }};
+
+        // init
+        loadCounts();
+        loadNotifications();
+    }]);
+
     // Angular app is ready – log route events
     app.run(['$rootScope', function ($rootScope) {
         $rootScope.$on('$routeChangeError', function (event, current, previous, rejection) {

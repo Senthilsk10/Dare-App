@@ -96,6 +96,8 @@ def admin_notification_detail(request, pk):
     elif request.method == 'PATCH':
         try:
             data = json.loads(request.body)
+            print(data)
+            return JsonResponse({"message":"recieved"},status=200,safe=False)
             project_id = data.get('project_id')
             try:
                 project = Project.objects.get(id=project_id)
@@ -201,4 +203,5 @@ def notification_counts(request):
 
 def admin_notifications_template(request):
     """Render the admin notifications template"""
+    # print(request.session['google_credentials'])
     return render(request, 'communications/admin_notifications.html')

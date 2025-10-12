@@ -37,9 +37,9 @@ urlpatterns = [
     path('manage-users/', views.manage_users, name='manage_users'),
 
     # Dummy sidebar URLs
-    path('department-dashboard/', views.department_dashboard, name='department_dashboard'),
-    path('manage-guides/', views.manage_guides, name='manage_guides'),
-    path('student-approvals/', views.student_approvals, name='student_approvals'),
+#     path('department-dashboard/', views.department_dashboard, name='department_dashboard'),
+#     path('manage-guides/', views.manage_guides, name='manage_guides'),
+#     path('student-approvals/', views.student_approvals, name='student_approvals'), #replaced by onboarding/#/object spa templates
     path('department-reports/', views.department_reports, name='department_reports'),
     path('my-students/', views.my_students, name='my_students'),
     path('project-management/', views.project_management, name='project_management'),

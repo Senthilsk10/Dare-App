@@ -160,7 +160,7 @@
       // Get CSRF token
       const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value || 
                        document.querySelector('meta[name=csrf-token]').getAttribute('content');
-
+      
       const isProject = new URLSearchParams(window.location.search).get('project') === 'true';
       const url = isProject ? "{% url 'communications:send_project_email' %}" : "{% url 'communications:send_email' %}";
 

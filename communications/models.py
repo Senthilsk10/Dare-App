@@ -1,6 +1,6 @@
 from django.db import models
 import uuid
-from projects.models import ProjectEvaluatorPool,Project
+from projects.models import VersionedProjectEvaluatorPool,ProjectEvaluatorPool,Project
 
 # Create your models here.
 class EmailCommunication(models.Model):
@@ -22,7 +22,7 @@ class EmailCommunication(models.Model):
     ]
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    eval_pool = models.ForeignKey(ProjectEvaluatorPool, on_delete=models.CASCADE)
+    eval_pool = models.ForeignKey(VersionedProjectEvaluatorPool, on_delete=models.CASCADE)
     email_type = models.CharField(max_length=20, choices=EMAIL_TYPE_CHOICES)
     subject = models.CharField(max_length=300)
     body = models.TextField()

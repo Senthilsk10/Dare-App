@@ -59,6 +59,17 @@ DRIVE_SCOPES = [
     'https://www.googleapis.com/auth/drive.readonly',
 ]
 
+SCOPES = [
+    "https://www.googleapis.com/auth/script.projects",
+    "https://www.googleapis.com/auth/script.scriptapp",
+    "https://www.googleapis.com/auth/script.external_request",
+    'https://www.googleapis.com/auth/gmail.readonly',
+    "https://www.googleapis.com/auth/gmail.send",
+    "https://www.googleapis.com/auth/drive.readonly",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/cloud-platform"
+]
+
 # Combined scopes for single authentication
 COMBINED_SCOPES = GMAIL_SCOPES + DRIVE_SCOPES
 
@@ -80,7 +91,7 @@ class GoogleServiceManager:
         scopes = {
             'gmail': GMAIL_SCOPES,
             'drive': DRIVE_SCOPES,
-            'combined': COMBINED_SCOPES
+            'combined': SCOPES
         }
         
         flow = Flow.from_client_secrets_file(
@@ -595,7 +606,7 @@ def get_recieved_emails_for_today():
             ).execute()
             
             messages = messages_result.get('messages', [])
-            
+            # return messages
             if not messages:
                 return {
                     'success': True,
@@ -656,14 +667,15 @@ def get_recieved_emails_for_today():
                     # Double-check if message is within our time range
                     if start_of_yesterday <= message_datetime <= end_of_yesterday:
                         
-                        # Extract email body
-                        body = extract_email_body(full_message)
+                        # Extract email body and attachments
+                        body, attachments = extract_email_body(full_message)
                         
                         email_data = {
                             'message_id': message_id,
                             'sender_email': sender_email,
                             'subject': subject or 'No Subject',
                             'body': body,
+                            'attachments': attachments,
                             'received_date': message_datetime,
                             'date_header': date_header
                         }
@@ -712,42 +724,69 @@ def get_recieved_emails_for_today():
 
 def extract_email_body(message):
     """
-    Extract email body from Gmail message payload
-    
+    Extract email body and attachments from Gmail message payload.
+
     Args:
-        message (dict): Gmail message object
-        
+        message (dict): Gmail message object (as returned by `users().messages().get(..., format='full')`)
+
     Returns:
-        str: Email body content
+        Tuple[str, List[dict]]: (body_text, attachments)
+            body_text: Plain-text body if available, otherwise HTML, otherwise fallback string.
+            attachments: List of dictionaries, one per attachment, each containing:
+                - filename (str)
+                - mimeType (str)
+                - attachmentId (str | None)
+                - data (bytes | None) – decoded attachment data if included in the message payload; otherwise None.
     """
+    def _gather_parts(parts, attachments, body_holder):
+        """Recursively walk MIME parts to find body text and attachments."""
+        for p in parts:
+            mime_type = p.get('mimeType')
+            filename = p.get('filename')
+            body_obj = p.get('body', {})
+            data = body_obj.get('data')
+            attachment_id = body_obj.get('attachmentId')
+
+            # Body extraction – prefer first text/plain part encountered
+            if mime_type == 'text/plain' and body_holder['text'] is None and data:
+                body_holder['text'] = base64.urlsafe_b64decode(data).decode('utf-8', errors='ignore')
+            elif mime_type == 'text/html' and body_holder['text'] is None and data:
+                # Keep as fallback until plain text found
+                body_holder['text'] = base64.urlsafe_b64decode(data).decode('utf-8', errors='ignore')
+
+            # Attachment detection – any part with filename counts as attachment
+            if filename:
+                attachments.append({
+                    'filename': filename,
+                    'mimeType': mime_type,
+                    'attachmentId': attachment_id,
+                    'data': base64.urlsafe_b64decode(data) if data else None,
+                })
+
+            # Recurse into nested parts
+            if 'parts' in p:
+                _gather_parts(p['parts'], attachments, body_holder)
+
     try:
         payload = message.get('payload', {})
-        
-        # Check if message has parts (multipart)
+        print(payload)
+        attachments = []
+        body_holder = {'text': None}
+
         if 'parts' in payload:
-            for part in payload['parts']:
-                if part.get('mimeType') == 'text/plain':
-                    data = part.get('body', {}).get('data')
-                    if data:
-                        return base64.urlsafe_b64decode(data).decode('utf-8')
-                elif part.get('mimeType') == 'text/html':
-                    # If no plain text, get HTML as fallback
-                    data = part.get('body', {}).get('data')
-                    if data:
-                        return base64.urlsafe_b64decode(data).decode('utf-8')
+            _gather_parts(payload['parts'], attachments, body_holder)
         else:
-            # Single part message
-            if payload.get('mimeType') == 'text/plain':
-                data = payload.get('body', {}).get('data')
-                if data:
-                    return base64.urlsafe_b64decode(data).decode('utf-8')
-            elif payload.get('mimeType') == 'text/html':
-                data = payload.get('body', {}).get('data')
-                if data:
-                    return base64.urlsafe_b64decode(data).decode('utf-8')
-        
-        return "Could not extract email body"
-        
+            # Single-part message
+            mime_type = payload.get('mimeType')
+            data = payload.get('body', {}).get('data')
+            if mime_type == 'text/plain' and data:
+                body_holder['text'] = base64.urlsafe_b64decode(data).decode('utf-8', errors='ignore')
+            elif mime_type == 'text/html' and data:
+                body_holder['text'] = base64.urlsafe_b64decode(data).decode('utf-8', errors='ignore')
+
+        body_text = body_holder['text'] or "Could not extract email body"
+        return body_text, attachments
+
     except Exception as e:
         print(f"Error extracting email body: {e}")
-        return f"Error extracting email body: {str(e)}"
+        return f"Error extracting email body: {str(e)}", []

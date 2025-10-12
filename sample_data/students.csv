@@ -1,0 +1,3 @@
+student_id,name,email,course_code,guide_email,enrollment_date,current_semester,status,phone,address,is_active
+S2025-001,Rohit Sharma,rohit@example.edu,CSE101,akshay@example.edu,2025-01-15,1,ENROLLED,+91-9000001001,"123, Tech Park, City",true
+S2025-002,Anita Rao,anita@example.edu,ECE201,sudha@example.edu,2025-01-16,1,ENROLLED,+91-9000001002,"456, Science St, City",true
